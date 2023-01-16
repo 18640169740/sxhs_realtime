@@ -27,6 +27,10 @@ public class CollectDataId {
     private Integer collectCount;
     private Integer collectLimitnum;
 
+    // 统计计算用，生成id时需要保存下来
+    private String numberReport;
+    private Date interfaceRecTime;
+
     public Long getId() {
         return id;
     }
@@ -209,5 +213,21 @@ public class CollectDataId {
 
     public void setCollectLimitnum(Integer collectLimitnum) {
         this.collectLimitnum = collectLimitnum;
+    }
+
+    public String getNumberReport() {
+        return numberReport;
+    }
+
+    public void setNumberReport(String numberReport) {
+        this.numberReport = numberReport;
+    }
+
+    public Date getInterfaceRecTime() {
+        return interfaceRecTime;
+    }
+
+    public void setInterfaceRecTime(Date interfaceRecTime) {
+        this.interfaceRecTime = interfaceRecTime;
     }
 }
