@@ -1,7 +1,5 @@
 package com.sxhs.realtime.bean;
 
-import java.util.Date;
-
 public class ReportDataId {
     private Long id;
     private Long submitId;
@@ -20,21 +18,21 @@ public class ReportDataId {
     private Integer collectPartId;
     private String tubeCode;
     private String collectUser;
-    private Date collectTime;
-    private Date packTime;
+    private String collectTime;
+    private String packTime;
     private String deliveryCode;
     private String collectOrgName;
     private String checkOrgName;
-    private Date receiveTime;
+    private String receiveTime;
     private String receiveUser;
     private String personId;
-    private Date checkTime;
+    private String checkTime;
     private String checkUser;
     private String checkResult;
     private String iggResult;
     private String igmResult;
     private String remark;
-    private Date addTime;
+    private String addTime;
     private Integer collectLimitnum;
     private Integer collectCount;
 
@@ -174,19 +172,19 @@ public class ReportDataId {
         this.collectUser = collectUser;
     }
 
-    public Date getCollectTime() {
+    public String getCollectTime() {
         return collectTime;
     }
 
-    public void setCollectTime(Date collectTime) {
+    public void setCollectTime(String collectTime) {
         this.collectTime = collectTime;
     }
 
-    public Date getPackTime() {
+    public String getPackTime() {
         return packTime;
     }
 
-    public void setPackTime(Date packTime) {
+    public void setPackTime(String packTime) {
         this.packTime = packTime;
     }
 
@@ -214,11 +212,11 @@ public class ReportDataId {
         this.checkOrgName = checkOrgName;
     }
 
-    public Date getReceiveTime() {
+    public String getReceiveTime() {
         return receiveTime;
     }
 
-    public void setReceiveTime(Date receiveTime) {
+    public void setReceiveTime(String receiveTime) {
         this.receiveTime = receiveTime;
     }
 
@@ -238,11 +236,11 @@ public class ReportDataId {
         this.personId = personId;
     }
 
-    public Date getCheckTime() {
+    public String getCheckTime() {
         return checkTime;
     }
 
-    public void setCheckTime(Date checkTime) {
+    public void setCheckTime(String checkTime) {
         this.checkTime = checkTime;
     }
 
@@ -286,11 +284,11 @@ public class ReportDataId {
         this.remark = remark;
     }
 
-    public Date getAddTime() {
+    public String getAddTime() {
         return addTime;
     }
 
-    public void setAddTime(Date addTime) {
+    public void setAddTime(String addTime) {
         this.addTime = addTime;
     }
 
