@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.starrocks.connector.flink.StarRocksSink;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.ReportDataId;
-import com.sxhs.realtime.udf.Date2Milliseconds;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.StateTtlConfig;
@@ -66,7 +65,6 @@ public class CollectAndReportTimeDifStat {
                 }
             }
         });
-        tEnv.createTemporarySystemFunction("Date2Milliseconds", Date2Milliseconds.class);
         Table reportTable = tEnv.fromDataStream(reportStream, $("areaId"), $("addTime"), $("collectTime"), $("checkTime"),
                 $("personId"), $("pt").proctime());
         tEnv.createTemporaryView("report", reportTable);
@@ -88,6 +86,7 @@ public class CollectAndReportTimeDifStat {
         SingleOutputStreamOperator<String> resultStream = statStream.keyBy((KeySelector<Row, Object>) row -> row.getField(0))
                 .map(new RichMapFunction<Row, String>() {
                     private ValueState<JSONObject> cacheState;
+                    private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
                     @Override
                     public void open(Configuration parameters) throws Exception {
@@ -114,12 +113,13 @@ public class CollectAndReportTimeDifStat {
                         if (cache == null) {
                             // TODO 生成id
                             jsonObj.put("id", "123456");
+                            jsonObj.put("create_time", sdf.format(new Date()));
                         } else {
                             jsonObj.put("id", cache.getLong("id"));
+                            jsonObj.put("create_time", cache.getString("create_time"));
                             jsonObj.put("check_persons", jsonObj.getInteger("check_persons") + cache.getInteger("check_persons"));
                         }
                         cacheState.update(jsonObj);
-                        jsonObj.put("create_time", row.getField(0).toString().split("_")[1]);
                         jsonObj.put("is_delete", 0);
                         return jsonObj.toJSONString();
                     }
