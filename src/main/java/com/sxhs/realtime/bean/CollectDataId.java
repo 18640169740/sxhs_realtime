@@ -31,4 +31,5 @@ public class CollectDataId {
     // 统计计算用，生成id时需要保存下来，原始数据为String，转int
     private Integer numberReport;
     private String interfaceRecTime;
+    private String userName;
 }

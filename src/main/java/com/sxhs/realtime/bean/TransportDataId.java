@@ -28,5 +28,6 @@ public class TransportDataId {
 
     private Integer numberReport;
     private String interfaceRecTime;
+    private String userName;
 
 }

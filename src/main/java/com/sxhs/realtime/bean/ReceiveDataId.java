@@ -29,4 +29,5 @@ public class ReceiveDataId {
     private TransportItem[] receivesItem;
 
     private String interfaceRecTime;
+    private String userName;
 }
