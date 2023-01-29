@@ -10,7 +10,6 @@ import org.apache.flink.api.common.state.StateTtlConfig;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -68,38 +67,31 @@ public class CollectAndReportTimeDifStat {
         Table reportTable = tEnv.fromDataStream(reportStream, $("areaId"), $("addTime"), $("collectTime"), $("checkTime"),
                 $("personId"), $("pt").proctime());
         tEnv.createTemporaryView("report", reportTable);
-        String statSql = "select " +
+        Table statTable = tEnv.sqlQuery("select " +
                 "concat_ws('_',cast(areaId as string),CAST(CURRENT_DATE as string),cast(TIMESTAMPDIFF(HOUR,TO_TIMESTAMP(collectTime),TO_TIMESTAMP(checkTime)) as string)) union_id, " +
                 "areaId area_id, " +
                 "TIMESTAMPDIFF(HOUR,TO_TIMESTAMP(collectTime),TO_TIMESTAMP(checkTime)) unit_hour, " +
                 "count(personId) check_persons " +
-//                "LOCALTIMESTAMP create_time, " +
-//                "0 is_delete " +
                 "from report " +
                 "group by " +
                 "TUMBLE(pt, INTERVAL '3' SECOND), " +
                 "TIMESTAMPDIFF(HOUR,TO_TIMESTAMP(collectTime),TO_TIMESTAMP(checkTime)), " +
-                "areaId";
-        Table statTable = tEnv.sqlQuery(statSql);
-//        statTable.execute().print();
+                "areaId");
         DataStream<Row> statStream = tEnv.toAppendStream(statTable, Row.class);
-        SingleOutputStreamOperator<String> resultStream = statStream.keyBy((KeySelector<Row, Object>) row -> row.getField(0))
+        SingleOutputStreamOperator<String> resultStream = statStream.keyBy(row -> row.getField(0))
                 .map(new RichMapFunction<Row, String>() {
                     private ValueState<JSONObject> cacheState;
-                    private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                    private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
                     @Override
                     public void open(Configuration parameters) throws Exception {
                         ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("CollectAndReportTimeDifStat", JSONObject.class);
-//                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
-                        // TODO 删除测试代码
-                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.seconds(10))
+                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
                                 .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                                 .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
                                 .build();
                         valueStateDescriptor.enableTimeToLive(ttlConfig);
                         cacheState = getRuntimeContext().getState(valueStateDescriptor);
-
                     }
 
                     @Override
@@ -112,7 +104,7 @@ public class CollectAndReportTimeDifStat {
 
                         if (cache == null) {
                             // TODO 生成id
-                            jsonObj.put("id", "123456");
+                            jsonObj.put("id", 123456);
                             jsonObj.put("create_time", sdf.format(new Date()));
                         } else {
                             jsonObj.put("id", cache.getLong("id"));
@@ -127,11 +119,11 @@ public class CollectAndReportTimeDifStat {
 
         SinkFunction<String> srSink = StarRocksSink.sink(
                 StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?test_huq")
+                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
                         .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "test_huq")
-                        .withProperty("username", "root")
-                        .withProperty("password", "SxHs@20230113")
+                        .withProperty("database-name", "nuc_db")
+                        .withProperty("username", "huquan")
+                        .withProperty("password", "oNa46nj0o65b@kvK")
                         .withProperty("table-name", "upload_log_checkhour")
                         .withProperty("sink.properties.format", "json")
                         .withProperty("sink.properties.strip_outer_array", "true")
@@ -143,7 +135,7 @@ public class CollectAndReportTimeDifStat {
         );
         // TODO 删除测试代码
         resultStream.print();
-        resultStream.addSink(srSink);
+//        resultStream.addSink(srSink);
         env.execute("CollectAndReportTimeDifStat");
 
     }
