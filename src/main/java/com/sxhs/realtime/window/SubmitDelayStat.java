@@ -1,8 +1,6 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSource;
-import com.starrocks.connector.flink.table.source.StarRocksSourceOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
@@ -10,24 +8,19 @@ import com.sxhs.realtime.bean.TransportDataId;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.state.*;
+import org.apache.flink.api.common.state.StateTtlConfig;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.datastream.BroadcastStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction;
-import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.StringData;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.Collector;
 
 // 数据上报延迟事件统计任务
 public class SubmitDelayStat {
@@ -89,6 +82,8 @@ public class SubmitDelayStat {
                 "from union_table as t1 " +
                 "left join client_data FOR SYSTEM_TIME AS OF t1.pt as t2 " +
                 "on t1.client_id=t2.client_id");
+        joinTable.execute().print();
+
         DataStream<Row> joinStream = tEnv.toAppendStream(joinTable, Row.class);
         SingleOutputStreamOperator<String> resultStream = joinStream.keyBy(row -> row.getField(0))
                 .map(new RichMapFunction<Row, String>() {
