@@ -32,8 +32,8 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
     private Connection connection = null;
     //id去重表
     private Table idTable;
-    //采样数据去重表
-    private Table collectTable;
+    //各环节关联关系表
+    private Table relationTable;
 
     @Override
     public void open(Configuration parameters) throws Exception {
@@ -45,7 +45,7 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
         connection = ConnectionFactory.createConnection(configuration);
 
         idTable = connection.getTable(TableName.valueOf(parameterTool.getRequired("hbase.id.table")));
-        collectTable = connection.getTable(TableName.valueOf(parameterTool.getRequired("hbase.collect.table")));
+        relationTable = connection.getTable(TableName.valueOf(parameterTool.getRequired("hbase.relation.table")));
     }
 
     @Override
@@ -53,6 +53,9 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
         super.close();
         if (idTable != null){
             idTable.close();
+        }
+        if (relationTable != null){
+            relationTable.close();
         }
         if (connection != null){
             connection.close();
@@ -65,32 +68,28 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
         JSONArray jsonArray = commonDuplicateData.getData();
         switch (type){
             case Constants.COLLECT_DATA:
+                //id维护
                 commonDataProcess(jsonArray, Constants.COLLECT_DATA, Arrays.asList("personIdCard","collectTime"));
                 //将采样数据中person_id_card+tube_code存入到hbase缓存中
-                for (Object obj : jsonArray) {
-                    JSONObject jsonObject = (JSONObject) obj;
-                    StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
-                    sj.add(jsonObject.getString("personIdCard"));
-                    sj.add(jsonObject.getString("tubeCode"));
-                    //hbase key
-                    String dataKey = sj.toString();
-                    byte[] rowKey = dataKey.getBytes();
-                    Put userRelPut = new Put(rowKey);
-                    userRelPut.addColumn(Constants.HBASE_FAMILY, "col".getBytes(), "".getBytes());
-                    collectTable.put(userRelPut);
-                }
+                collectRelProcess(jsonArray);
                 break;
             case Constants.TRANSPORT_DATA:
                 transportReceiveProcess(jsonArray, "deliveryCode", Constants.TRANSPORT_DATA, "transportItem", Constants.TRANSPORT_TUBE);
+                transportRelProcess(jsonArray);
                 break;
             case Constants.RECEIVE_DATA:
                 transportReceiveProcess(jsonArray, "receiveCode", Constants.RECEIVE_DATA, "receivesItem", Constants.RECEIVE_TUBE);
+                receiveRelProcess(jsonArray);
                 break;
             case Constants.REPORT_DATA:
                 commonDataProcess(jsonArray, Constants.REPORT_DATA, Arrays.asList("personIdCard","collectTime","checkTime"));
+                //将检测结果数据中person_id_card+tube_code存入到hbase缓存中
+                reportRelProcess(jsonArray);
                 break;
             case Constants.XA_REPORT_DATA:
                 commonDataProcess(jsonArray, Constants.XA_REPORT_DATA,Arrays.asList("personIdCard", "collectTime", "checkTime"));
+                //将检测结果数据中person_id_card+tube_code存入到hbase缓存中
+                reportRelProcess(jsonArray);
                 break;
             case Constants.CHECK_ORG:
                 commonDataProcess(jsonArray, Constants.CHECK_ORG,Arrays.asList("creditCode", "areaId", "orgName"));
@@ -102,6 +101,91 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 break;
         }
         collector.collect(commonDuplicateData);
+    }
+
+    /**
+     * 接收数据关联关系存储
+     * @param jsonArray
+     * @throws IOException
+     */
+    private void receiveRelProcess(JSONArray jsonArray) throws IOException {
+        for (Object obj : jsonArray) {
+            JSONObject jsonObject = (JSONObject) obj;
+            String receiveTime = jsonObject.getString("receiveTime");
+            String deliveryCode = jsonObject.getString("deliveryCode");
+            //hbase key
+            byte[] rowKey = deliveryCode.getBytes();
+            Put hbaseRelPut = new Put(rowKey);
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "receiveTime".getBytes(), receiveTime.getBytes());
+            relationTable.put(hbaseRelPut);
+        }
+    }
+
+    /**
+     * 转运数据关联关系存储
+     * @param jsonArray
+     * @throws IOException
+     */
+    private void transportRelProcess(JSONArray jsonArray) throws IOException {
+        for (Object obj : jsonArray) {
+            JSONObject jsonObject = (JSONObject) obj;
+            String tubeNum = jsonObject.getString("tubeNum");
+            String packNum = jsonObject.getString("packNum");
+            String deliveryTime = jsonObject.getString("deliveryTime");
+            String deliveryCode = jsonObject.getString("deliveryCode");
+            //hbase key
+            byte[] rowKey = deliveryCode.getBytes();
+            Put hbaseRelPut = new Put(rowKey);
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "tubeNum".getBytes(), tubeNum.getBytes());
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "packNum".getBytes(), packNum.getBytes());
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "deliveryTime".getBytes(), deliveryTime.getBytes());
+            relationTable.put(hbaseRelPut);
+        }
+    }
+
+    /**
+     * 将采样数据中person_id_card+tube_code存入到hbase缓存中
+     * @param jsonArray
+     * @throws IOException
+     */
+    private void collectRelProcess(JSONArray jsonArray) throws IOException {
+        for (Object obj : jsonArray) {
+            JSONObject jsonObject = (JSONObject) obj;
+            StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
+            sj.add(jsonObject.getString("personIdCard"));
+            sj.add(jsonObject.getString("tubeCode"));
+            //hbase key
+            String dataKey = sj.toString();
+            byte[] rowKey = dataKey.getBytes();
+            Put hbaseRelPut = new Put(rowKey);
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "collectTime".getBytes(), jsonObject.getString("collectTime").getBytes());
+            relationTable.put(hbaseRelPut);
+
+            Put hbaseRelPut2 = new Put(jsonObject.getString("tubeCode").getBytes());
+            hbaseRelPut2.addColumn(Constants.HBASE_FAMILY, "tubeCollectTime".getBytes(), jsonObject.getString("collectTime").getBytes());
+            hbaseRelPut2.addColumn(Constants.HBASE_FAMILY, "submitId".getBytes(), jsonObject.getString("submitId").getBytes());
+            relationTable.put(hbaseRelPut2);
+        }
+    }
+
+    /**
+     * 将检测结果数据中person_id_card+tube_code存入到hbase缓存中
+     * @param jsonArray
+     * @throws IOException
+     */
+    private void reportRelProcess(JSONArray jsonArray) throws IOException {
+        for (Object obj : jsonArray) {
+            JSONObject jsonObject = (JSONObject) obj;
+            StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
+            sj.add(jsonObject.getString("personIdCard"));
+            sj.add(jsonObject.getString("tubeCode"));
+            //hbase key
+            String dataKey = sj.toString();
+            byte[] rowKey = dataKey.getBytes();
+            Put hbaseRelPut = new Put(rowKey);
+            hbaseRelPut.addColumn(Constants.HBASE_FAMILY, "checkTime".getBytes(), jsonObject.getString("checkTime").getBytes());
+            relationTable.put(hbaseRelPut);
+        }
     }
 
     /**
@@ -125,7 +209,7 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 dataId = SnowflakeIdWorker.generateIdReverse();
                 putIdToHbase(dataKey, type, dataId);
             }
-            jsonObject.put(Constants.ID, dataId);
+            jsonObject.put(Constants.ID, Long.valueOf(dataId));
         }
     }
 
@@ -149,7 +233,7 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 dataId = SnowflakeIdWorker.generateIdReverse();
                 putIdToHbase(dataKey, receiveData, dataId);
             }
-            jsonObject.put(Constants.ID, dataId);
+            jsonObject.put(Constants.ID, Long.valueOf(dataId));
 
             JSONArray receivesItem = jsonObject.getJSONArray(receivesItem2);
             for (Object itemObj : receivesItem) {
@@ -162,7 +246,7 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                     dataId2 = SnowflakeIdWorker.generateIdReverse();
                     putIdToHbase(dataKey2, receiveTube, dataId2);
                 }
-                itemJsonObject.put(Constants.ID, dataId2);
+                itemJsonObject.put(Constants.ID, Long.valueOf(dataId2));
             }
         }
     }
@@ -176,9 +260,9 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
      */
     private void putIdToHbase(String key, String col, String value) throws IOException {
         byte[] rowKey = MD5Hash.getMD5AsHex((key).getBytes()).getBytes();
-        Put userRelPut = new Put(rowKey);
-        userRelPut.addColumn(Constants.HBASE_FAMILY, col.getBytes(), value.getBytes());
-        idTable.put(userRelPut);
+        Put hbaseRelPut = new Put(rowKey);
+        hbaseRelPut.addColumn(Constants.HBASE_FAMILY, col.getBytes(), value.getBytes());
+        idTable.put(hbaseRelPut);
     }
 
     /**

@@ -1,5 +1,10 @@
 package com.sxhs.realtime.common;
 
+import com.sxhs.realtime.bean.ProblemDataCr;
+import com.sxhs.realtime.bean.ProblemDataTre;
+import org.apache.commons.lang.time.FastDateFormat;
+import org.apache.flink.util.OutputTag;
+
 /**
  * @Description:
  * @Author: zhangJunWei
@@ -13,6 +18,7 @@ public class Constants {
     public static final String HBASE_KEY_SPLIT = "_";
     //hbase
     public static byte[] HBASE_FAMILY = "cf".getBytes();
+    public static byte[] HBASE_COLUMN = "col".getBytes();
 
     /**
      * 核酸数据类型
@@ -31,4 +37,8 @@ public class Constants {
      * 数据字段
      */
     public static final String ID = "id";
+
+    public static FastDateFormat FASTDATEFORMAT= FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss");
+    public static OutputTag<ProblemDataCr> CR_TAG = new OutputTag<ProblemDataCr>("crTag") {};
+    public static OutputTag<ProblemDataTre> TRE_TAG = new OutputTag<ProblemDataTre>("treTag") {};
 }
