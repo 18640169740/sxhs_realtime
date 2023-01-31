@@ -9,6 +9,7 @@ import com.sxhs.realtime.bean.TransportDataId;
 import com.sxhs.realtime.common.BaseJob;
 import com.sxhs.realtime.operator.JsonToHourSumReport;
 import com.sxhs.realtime.operator.ReportStatProcess;
+import com.sxhs.realtime.util.JobUtils;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -99,19 +100,7 @@ public class ReportStatDriver extends BaseJob {
             }
         });
 
-        SinkFunction<String> sink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030,10.17.41.139:9030,10.17.41.140:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030;10.17.41.139:8030;10.17.41.140:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "zhangjunwei")
-                        .withProperty("password", "Q9yt8fVjdyBq6n$d")
-                        .withProperty("table-name", "hour_sum_report")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        .withProperty("sink.semantic", "exactly-once")
-                        .build()
-        );
+        SinkFunction<String> sink = JobUtils.getStarrocksSink("hour_sum_report");
 
         strStream.addSink(sink);
 

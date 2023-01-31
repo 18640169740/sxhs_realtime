@@ -42,7 +42,6 @@ public class DataCheckProcess<T,V> extends ProcessFunction<T, V> {
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        super.open(parameters);
         ParameterTool parameterTool = (ParameterTool) getRuntimeContext().getExecutionConfig().getGlobalJobParameters();
         org.apache.hadoop.conf.Configuration configuration = HBaseConfiguration.create();
         configuration.set("hbase.zookeeper.quorum", parameterTool.getRequired("hbase.zookeeper.quorum"));

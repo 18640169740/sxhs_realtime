@@ -1,10 +1,19 @@
 package com.sxhs.realtime.driver;
 
+import com.starrocks.connector.flink.StarRocksSink;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.common.Constants;
+import com.sxhs.realtime.operator.ReportLogProcess;
+import com.sxhs.realtime.operator.ReportStatProcess;
+import com.sxhs.realtime.util.JobUtils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
@@ -27,7 +36,7 @@ public class ReportLogDriver extends BaseJob {
                     "--source.topic.name", "NUC_DATA_ZJW",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
-                    "--hbase.report.stat.table", "nuc_report_stat",
+                    "--hbase.relation.table", "nuc_relation_stat",
             };
         }
         //参数解析
@@ -48,6 +57,25 @@ public class ReportLogDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
+
+        //日志统计
+        SingleOutputStreamOperator<String> dataStream = kafkaSource.process(new ReportLogProcess());
+
+        DataStream<String> uploadLogStream = dataStream.getSideOutput(Constants.UPLOAD_LOG_TAG);
+        DataStream<String> uploadLogFailStream = dataStream.getSideOutput(Constants.UPLOAD_LOG_FAIL_TAG);
+        DataStream<String> uploadReportStream = dataStream.getSideOutput(Constants.UPLOAD_REPORT_TAG);
+        DataStream<String> uploadReportFailStream = dataStream.getSideOutput(Constants.UPLOAD_REPORT_FAIL_TAG);
+
+        SinkFunction<String> uploadLogSink = JobUtils.getStarrocksSink("upload_log");
+        SinkFunction<String> uploadLogFailSink = JobUtils.getStarrocksSink("upload_log_fail");
+        SinkFunction<String> uploadReportSink = JobUtils.getStarrocksSink("upload_report");
+        SinkFunction<String> uploadReportFailSink = JobUtils.getStarrocksSink("upload_report_fail");
+
+        //输出到starrocks
+        uploadLogStream.addSink(uploadLogSink);
+        uploadLogFailStream.addSink(uploadLogFailSink);
+        uploadReportStream.addSink(uploadReportSink);
+        uploadReportFailStream.addSink(uploadReportFailSink);
 
         env.execute("zhangjunwei_report_log_jar");
     }

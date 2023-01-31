@@ -17,7 +17,7 @@ public class JsonToCommonDuplicateData implements FlatMapFunction<String, Common
         if (StringUtils.isBlank(str)) {
             return;
         }
-        CommonDuplicateData commonDuplicateData = (CommonDuplicateData) JSON.parseObject(str, CommonDuplicateData.class);
+        CommonDuplicateData commonDuplicateData = JSON.parseObject(str, CommonDuplicateData.class);
 
         if(commonDuplicateData != null && StringUtils.isNotBlank(commonDuplicateData.getType())){
             collector.collect(commonDuplicateData);
