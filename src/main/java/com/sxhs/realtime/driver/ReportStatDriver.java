@@ -1,11 +1,7 @@
 package com.sxhs.realtime.driver;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
-import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.HourSumReportId;
-import com.sxhs.realtime.bean.TransportDataId;
 import com.sxhs.realtime.common.BaseJob;
 import com.sxhs.realtime.operator.JsonToHourSumReport;
 import com.sxhs.realtime.operator.ReportStatProcess;
@@ -23,7 +19,6 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -63,7 +58,7 @@ public class ReportStatDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
-
+//        DataStreamSource<String> kafkaSource = env.readTextFile("C:\\Users\\q4189\\Desktop\\test.txt");
         //数据格式转换
         SingleOutputStreamOperator<HourSumReportId> dataStream = kafkaSource.flatMap(new JsonToHourSumReport());
 

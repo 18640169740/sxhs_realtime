@@ -1,19 +1,19 @@
 package com.sxhs.realtime.operator;
 
-import com.sxhs.realtime.bean.CommonDuplicateData;
 import com.sxhs.realtime.bean.HourSumReportId;
 import com.sxhs.realtime.common.Constants;
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.StateTtlConfig;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.MD5Hash;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.StringJoiner;
 
 /**
@@ -23,32 +23,36 @@ import java.util.StringJoiner;
  */
 public class ReportStatProcess extends KeyedProcessFunction<Tuple3<String,String,String>, HourSumReportId, HourSumReportId> {
 
-    //hbase相关
-    private Connection connection = null;
-    //上报信息统计缓存表
-    private Table reportStatTable;
+    /**
+     * state设置
+     */
+    private transient MapState<String, Map<String,String>> mapState;
+    //state ttl
+    private int stateDays = 2;
+    //state name
+    private String stateName = "reportStatState";
 
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        ParameterTool parameterTool = (ParameterTool) getRuntimeContext().getExecutionConfig().getGlobalJobParameters();
-        org.apache.hadoop.conf.Configuration configuration = HBaseConfiguration.create();
-        configuration.set("hbase.zookeeper.quorum", parameterTool.getRequired("hbase.zookeeper.quorum"));
-        configuration.set("zookeeper.znode.parent", parameterTool.getRequired("zookeeper.znode.parent"));
-        connection = ConnectionFactory.createConnection(configuration);
-
-        reportStatTable = connection.getTable(TableName.valueOf(parameterTool.getRequired("hbase.report.stat.table")));
+        //set state
+        MapStateDescriptor<String, Map<String,String>> descriptor =
+                new MapStateDescriptor<>(
+                        stateName,
+                        Types.STRING,
+                        Types.MAP(Types.STRING,Types.STRING));
+        StateTtlConfig ttlConfig = StateTtlConfig
+                .newBuilder(Time.days(stateDays))
+                .setUpdateType(StateTtlConfig.UpdateType.OnCreateAndWrite)
+                .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+                .build();
+        descriptor.enableTimeToLive(ttlConfig);
+        mapState = getRuntimeContext().getMapState(descriptor);
     }
 
     @Override
     public void close() throws Exception {
         super.close();
-        if (reportStatTable != null){
-            reportStatTable.close();
-        }
-        if (connection != null){
-            connection.close();
-        }
     }
 
     @Override
@@ -61,41 +65,37 @@ public class ReportStatProcess extends KeyedProcessFunction<Tuple3<String,String
         sj.add(hourSumReportId.getCollectDate());
         sj.add(String.valueOf(hourSumReportId.getUnitHour()));
         String key = sj.toString();
-        byte[] rowKey = MD5Hash.getMD5AsHex((key).getBytes()).getBytes();
-
-        //从hbase拉取数据
-        Get get = new Get(rowKey);
-        Result result = reportStatTable.get(get);
-        Put hbasePut = new Put(rowKey);
-        if (result == null) {
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "createTime".getBytes(), hourSumReportId.getCreateTime().getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "id".getBytes(), hourSumReportId.getId().toString().getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "collectPersons".getBytes(), String.valueOf(hourSumReportId.getCollectPersons()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "collectSampleNum".getBytes(), String.valueOf(hourSumReportId.getCollectSampleNum()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "transferPersons".getBytes(), String.valueOf(hourSumReportId.getTransferPersons()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "transferSampleNum".getBytes(), String.valueOf(hourSumReportId.getTransferSampleNum()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "receivePersons".getBytes(), String.valueOf(hourSumReportId.getReceivePersons()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "receiveSampleNum".getBytes(), String.valueOf(hourSumReportId.getReceiveSampleNum()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "checkPersons".getBytes(), String.valueOf(hourSumReportId.getCheckPersons()).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "checkSampleNum".getBytes(), String.valueOf(hourSumReportId.getCheckSampleNum()).getBytes());
+        Map<String, String> result = mapState.get(key);
+        if (result == null || result.size() == 0) {
+            result = new HashMap<>();
+            result.put("createTime",hourSumReportId.getCreateTime());
+            result.put("id",hourSumReportId.getId().toString());
+            result.put("collectPersons",String.valueOf(hourSumReportId.getCollectPersons()));
+            result.put("collectSampleNum",String.valueOf(hourSumReportId.getCollectSampleNum()));
+            result.put("transferPersons",String.valueOf(hourSumReportId.getTransferPersons()));
+            result.put("transferSampleNum",String.valueOf(hourSumReportId.getTransferSampleNum()));
+            result.put("receivePersons",String.valueOf(hourSumReportId.getReceivePersons()));
+            result.put("receiveSampleNum",String.valueOf(hourSumReportId.getReceiveSampleNum()));
+            result.put("checkPersons",String.valueOf(hourSumReportId.getCheckPersons()));
+            result.put("checkSampleNum",String.valueOf(hourSumReportId.getCheckSampleNum()));
         }else{
-            String createTime = Bytes.toString(result.getValue(Constants.HBASE_FAMILY, "createTime".getBytes()));
-            Long id = Bytes.toLong(result.getValue(Constants.HBASE_FAMILY, "id".getBytes()));
-            int collectPersons = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "collectPersons".getBytes()))
+            String createTime = result.get("createTime");
+            Long id = Long.parseLong(result.get("id"));
+            int collectPersons = Integer.parseInt(result.get("collectPersons"))
                     + hourSumReportId.getCollectPersons();
-            int collectSampleNum = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "collectSampleNum".getBytes()))
+            int collectSampleNum = Integer.parseInt(result.get("collectSampleNum"))
                     + hourSumReportId.getCollectSampleNum();
-            int transferPersons = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "transferPersons".getBytes()))
+            int transferPersons = Integer.parseInt(result.get("transferPersons"))
                     + hourSumReportId.getTransferPersons();
-            int transferSampleNum = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "transferSampleNum".getBytes()))
+            int transferSampleNum = Integer.parseInt(result.get("transferSampleNum"))
                     + hourSumReportId.getTransferSampleNum();
-            int receivePersons = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "receivePersons".getBytes()))
+            int receivePersons = Integer.parseInt(result.get("receivePersons"))
                     + hourSumReportId.getReceivePersons();
-            int receiveSampleNum = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "receiveSampleNum".getBytes()))
+            int receiveSampleNum =  Integer.parseInt(result.get("receiveSampleNum"))
                     + hourSumReportId.getReceiveSampleNum();
-            int checkPersons = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "checkPersons".getBytes()))
+            int checkPersons = Integer.parseInt(result.get("checkPersons"))
                     + hourSumReportId.getCheckPersons();
-            int checkSampleNum = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "checkSampleNum".getBytes()))
+            int checkSampleNum = Integer.parseInt(result.get("checkSampleNum"))
                     + hourSumReportId.getCheckSampleNum();
             hourSumReportId.setCreateTime(createTime);
             hourSumReportId.setId(id);
@@ -108,16 +108,16 @@ public class ReportStatProcess extends KeyedProcessFunction<Tuple3<String,String
             hourSumReportId.setCheckPersons(checkPersons);
             hourSumReportId.setCheckSampleNum(checkSampleNum);
 
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "collectPersons".getBytes(), String.valueOf(collectPersons).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "collectSampleNum".getBytes(), String.valueOf(collectSampleNum).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "transferPersons".getBytes(), String.valueOf(transferPersons).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "transferSampleNum".getBytes(), String.valueOf(transferSampleNum).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "receivePersons".getBytes(), String.valueOf(receivePersons).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "receiveSampleNum".getBytes(), String.valueOf(receiveSampleNum).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "checkPersons".getBytes(), String.valueOf(checkPersons).getBytes());
-            hbasePut.addColumn(Constants.HBASE_FAMILY, "checkSampleNum".getBytes(), String.valueOf(checkSampleNum).getBytes());
+            result.put("collectPersons",String.valueOf(collectPersons));
+            result.put("collectSampleNum",String.valueOf(collectSampleNum));
+            result.put("transferPersons",String.valueOf(transferPersons));
+            result.put("transferSampleNum",String.valueOf(transferSampleNum));
+            result.put("receivePersons",String.valueOf(receivePersons));
+            result.put("receiveSampleNum",String.valueOf(receiveSampleNum));
+            result.put("checkPersons",String.valueOf(checkPersons));
+            result.put("checkSampleNum",String.valueOf(checkSampleNum));
         }
-        reportStatTable.put(hbasePut);
+        mapState.put(key,result);
         collector.collect(hourSumReportId);
     }
 }

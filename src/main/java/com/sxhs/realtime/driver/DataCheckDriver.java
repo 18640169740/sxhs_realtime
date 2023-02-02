@@ -39,7 +39,7 @@ public class DataCheckDriver extends BaseJob {
             args = new String[]{
                     "--bootstrap.servers", "10.17.41.132:9092,10.17.41.133:9092,10.17.41.134:9092",
                     "--group.id", "zjw_test1",
-                    "--source.topic.name", "NUC_DATA_ZJW",
+                    "--source.topic.name", "test_w",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
                     "--hbase.relation.table", "nuc_relation_distinct",
@@ -65,6 +65,7 @@ public class DataCheckDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
+//        DataStreamSource<String> kafkaSource = env.readTextFile("C:\\Users\\q4189\\Desktop\\test.txt");
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(kafkaSource);
@@ -96,6 +97,7 @@ public class DataCheckDriver extends BaseJob {
                 return JSONObject.toJSONString(problemDataCr);
             }
         });
+
         DataStream<String> treStrStream= treDataStream.map(new MapFunction<ProblemDataTre, String>() {
             @Override
             public String map(ProblemDataTre problemDataTre) throws Exception {

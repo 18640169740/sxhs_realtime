@@ -32,12 +32,12 @@ public class CommonAddIdDriver extends BaseJob {
             args = new String[]{
                     "--bootstrap.servers", "10.17.41.132:9092,10.17.41.133:9092,10.17.41.134:9092",
                     "--group.id", "zjw_test1",
-                    "--source.topic.name", "NUC_DATA_ZJW",
-                    "--sink.topic.name", "NUC_DATA_ID_ZJW",
+                    "--source.topic.name", "test1",
+                    "--sink.topic.name", "zjw_test",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
                     "--hbase.id.table", "nuc_id_distinct",
-                    "--hbase.collect.table", "nuc_relation_distinct",
+                    "--hbase.relation.table", "nuc_relation_distinct",
             };
         }
 
@@ -55,8 +55,8 @@ public class CommonAddIdDriver extends BaseJob {
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
         FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
-//        input.setStartFromGroupOffsets();
-        input.setStartFromEarliest();
+        input.setStartFromGroupOffsets();
+//        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
 

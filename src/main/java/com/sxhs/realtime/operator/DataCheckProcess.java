@@ -30,7 +30,7 @@ import java.util.*;
  * @Author: zhangJunWei
  * @CreateTime: 2023/1/29 14:50
  */
-public class DataCheckProcess<T,V> extends ProcessFunction<T, V> {
+public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
 
     //hbase相关
     private Connection connection = null;
@@ -66,7 +66,7 @@ public class DataCheckProcess<T,V> extends ProcessFunction<T, V> {
     }
 
     @Override
-    public void processElement(T t, Context context, Collector<V> collector) throws Exception {
+    public void processElement(T t, Context context, Collector<Object> collector) throws Exception {
         if(t instanceof CollectDataId){
             //采样校验
             CollectDataId dto = (CollectDataId) t;

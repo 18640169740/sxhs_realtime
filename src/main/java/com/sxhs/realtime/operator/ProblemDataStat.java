@@ -1,12 +1,20 @@
 package com.sxhs.realtime.operator;
 
 import com.alibaba.fastjson.JSONObject;
+import com.starrocks.thrift.TKeysType;
 import com.sxhs.realtime.bean.HourSumReportId;
 import com.sxhs.realtime.bean.ProblemData;
 import com.sxhs.realtime.bean.UploadLogPro;
 import com.sxhs.realtime.common.Constants;
 import com.sxhs.realtime.util.SnowflakeIdWorker;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.StateTtlConfig;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -20,6 +28,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.MD5Hash;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.StringJoiner;
 
 /**
@@ -29,31 +39,36 @@ import java.util.StringJoiner;
  */
 public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,String>, ProblemData, String> {
 
-    //hbase相关
-    private Connection connection = null;
-    //统计缓存表
-    private Table uploadLogTable;
+    /**
+     * state设置
+     */
+    private transient MapState<String, Map<String,Long>> mapState;
+    //state ttl
+    private int stateDays = 2;
+    //state name
+    private String stateName = "problemStatState";
 
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        ParameterTool parameterTool = (ParameterTool) getRuntimeContext().getExecutionConfig().getGlobalJobParameters();
-        org.apache.hadoop.conf.Configuration configuration = HBaseConfiguration.create();
-        configuration.set("hbase.zookeeper.quorum", parameterTool.getRequired("hbase.zookeeper.quorum"));
-        configuration.set("zookeeper.znode.parent", parameterTool.getRequired("zookeeper.znode.parent"));
-        connection = ConnectionFactory.createConnection(configuration);
-        uploadLogTable = connection.getTable(TableName.valueOf(parameterTool.getRequired("hbase.upload.log.table")));
+        //set state
+        MapStateDescriptor<String, Map<String,Long>> descriptor =
+                new MapStateDescriptor<>(
+                        stateName,
+                        Types.STRING,
+                        Types.MAP(Types.STRING,Types.LONG));
+        StateTtlConfig ttlConfig = StateTtlConfig
+                .newBuilder(Time.days(stateDays))
+                .setUpdateType(StateTtlConfig.UpdateType.OnCreateAndWrite)
+                .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+                .build();
+        descriptor.enableTimeToLive(ttlConfig);
+        mapState = getRuntimeContext().getMapState(descriptor);
     }
 
     @Override
     public void close() throws Exception {
         super.close();
-        if (uploadLogTable != null){
-            uploadLogTable.close();
-        }
-        if (connection != null){
-            connection.close();
-        }
     }
 
     @Override
@@ -65,17 +80,11 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
             return;
         }
 
+        //key
         StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
         sj.add(areaId.toString());
         sj.add(source.toString());
         sj.add(createTime.substring(0,10));
-
-        byte[] rowKey = sj.toString().getBytes();
-
-        //从hbase拉取数据
-        Get get = new Get(rowKey);
-        Result result = uploadLogTable.get(get);
-        Put hbasePut = new Put(rowKey);
 
         UploadLogPro uploadLogPro = new UploadLogPro();
         Long id = 0L;
@@ -96,8 +105,10 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
         int re_id_number = 0;
         int re_phone_number = 0;
 
+        String key = sj.toString();
+        Map<String, Long> result = mapState.get(key);
         //统计数据
-        if (result == null) {
+        if (result == null || result.size() == 0) {
             id = Long.valueOf(SnowflakeIdWorker.generateIdReverse());
             upload_number = getUploadLogNumByType(problemData,Constants.UPLOAD_NUMBER);
             success_number = getUploadLogNumByType(problemData,Constants.SUCCESS_NUMBER);
@@ -115,39 +126,40 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
             tr_phone_number = getUploadLogNumByType(problemData,Constants.TR_PHONE_NUMBER);
             re_id_number = getUploadLogNumByType(problemData,Constants.RE_ID_NUMBER);
             re_phone_number = getUploadLogNumByType(problemData,Constants.RE_PHONE_NUMBER);
+            result = new HashMap<>();
         }else{
-            id = Bytes.toLong(result.getValue(Constants.HBASE_FAMILY, "id".getBytes()));
-            upload_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "upload_number".getBytes()))
-                + getUploadLogNumByType(problemData,Constants.UPLOAD_NUMBER);
-            success_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "success_number".getBytes()))
+            id = result.get("id");
+            upload_number = result.get("upload_number").intValue()
+                    + getUploadLogNumByType(problemData,Constants.UPLOAD_NUMBER);
+            success_number = result.get("success_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.SUCCESS_NUMBER);
-            fail_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "fail_number".getBytes()))
+            fail_number = result.get("fail_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.FAIL_NUMBER);
-            fail_end_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "fail_end_number".getBytes()))
+            fail_end_number = result.get("fail_end_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.FAIL_END_NUMBER);
-            error_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "error_number".getBytes()))
+            error_number = result.get("error_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.ERROR_NUMBER);
-            cid_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "cid_number".getBytes()))
+            cid_number = result.get("cid_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.CID_NUMBER);
-            cname_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "cname_number".getBytes()))
+            cname_number = result.get("cname_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.CNAME_NUMBER);
-            cphone_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "cphone_number".getBytes()))
+            cphone_number = result.get("cphone_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.CPHONE_NUMBER);
-            rid_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "rid_number".getBytes()))
+            rid_number = result.get("rid_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.RID_NUMBER);
-            rname_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "rname_number".getBytes()))
+            rname_number = result.get("rname_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.RNAME_NUMBER);
-            rphone_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "rphone_number".getBytes()))
+            rphone_number = result.get("rphone_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.RPHONE_NUMBER);
-            time_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "time_number".getBytes()))
+            time_number = result.get("time_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.TIME_NUMBER);
-            tr_id_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "tr_id_number".getBytes()))
+            tr_id_number = result.get("tr_id_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.TR_ID_NUMBER);
-            tr_phone_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "tr_phone_number".getBytes()))
+            tr_phone_number = result.get("tr_phone_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.TR_PHONE_NUMBER);
-            re_id_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "re_id_number".getBytes()))
+            re_id_number = result.get("re_id_number").intValue()
                 + getUploadLogNumByType(problemData,Constants.RE_ID_NUMBER);
-            re_phone_number = Bytes.toInt(result.getValue(Constants.HBASE_FAMILY, "re_phone_number".getBytes()))
+            re_phone_number = result.get("re_phone_number").intValue()
                     + getUploadLogNumByType(problemData,Constants.RE_PHONE_NUMBER);
         }
 
@@ -169,7 +181,7 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
         uploadLogPro.setTime_number(time_number);
         uploadLogPro.setUpload_time(createTime.substring(0,10) + " 00:00:00");
         uploadLogPro.setCreate_by(problemData.getCreate_by());
-        uploadLogPro.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
+        uploadLogPro.setCreate_time(createTime.substring(0,10) + " 00:00:00");
         uploadLogPro.setIs_delete(0);
         uploadLogPro.setTr_id_number(tr_id_number);
         uploadLogPro.setTr_phone_number(tr_phone_number);
@@ -177,24 +189,25 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
         uploadLogPro.setRe_phone_number(re_phone_number);
 
         //统计结果更新
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "id".getBytes(), id.toString().getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "upload_number".getBytes(),String.valueOf(upload_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "success_number".getBytes(), String.valueOf(success_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "fail_number".getBytes(), String.valueOf(fail_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "fail_end_number".getBytes(), String.valueOf(fail_end_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "error_number".getBytes(), String.valueOf(error_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "cid_number".getBytes(), String.valueOf(cid_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "cname_number".getBytes(), String.valueOf(cname_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "cphone_number".getBytes(), String.valueOf(cphone_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "rid_number".getBytes(), String.valueOf(rid_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "rname_number".getBytes(), String.valueOf(rname_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "rphone_number".getBytes(), String.valueOf(rphone_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "time_number".getBytes(), String.valueOf(time_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "tr_id_number".getBytes(), String.valueOf(tr_id_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "tr_phone_number".getBytes(), String.valueOf(tr_phone_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "re_id_number".getBytes(), String.valueOf(re_id_number).getBytes());
-        hbasePut.addColumn(Constants.HBASE_FAMILY, "re_phone_number".getBytes(), String.valueOf(re_phone_number).getBytes());
-        uploadLogTable.put(hbasePut);
+        result.put("id",id);
+        result.put("upload_number", (long) upload_number);
+        result.put("success_number", (long) success_number);
+        result.put("fail_number", (long) fail_number);
+        result.put("fail_end_number", (long) fail_end_number);
+        result.put("error_number", (long) error_number);
+        result.put("cid_number", (long) cid_number);
+        result.put("cname_number", (long) cname_number);
+        result.put("cphone_number", (long) cphone_number);
+        result.put("rid_number", (long) rid_number);
+        result.put("rname_number", (long) rname_number);
+        result.put("rphone_number", (long) rphone_number);
+        result.put("time_number", (long) time_number);
+        result.put("tr_id_number", (long) tr_id_number);
+        result.put("tr_phone_number", (long) tr_phone_number);
+        result.put("re_id_number", (long) re_id_number);
+        result.put("re_phone_number", (long) re_phone_number);
+
+        mapState.put(key,result);
         collector.collect(JSONObject.toJSONString(uploadLogPro));
     }
 

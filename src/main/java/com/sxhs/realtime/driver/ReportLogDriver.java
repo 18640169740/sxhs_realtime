@@ -36,7 +36,7 @@ public class ReportLogDriver extends BaseJob {
                     "--source.topic.name", "NUC_DATA_ZJW",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
-                    "--hbase.relation.table", "nuc_relation_stat",
+                    "--hbase.relation.table", "nuc_relation_distinct",
             };
         }
         //参数解析
@@ -57,6 +57,7 @@ public class ReportLogDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
+//        DataStreamSource<String> kafkaSource = env.readTextFile("C:\\Users\\q4189\\Desktop\\test.txt");
 
         //日志统计
         SingleOutputStreamOperator<String> dataStream = kafkaSource.process(new ReportLogProcess());
