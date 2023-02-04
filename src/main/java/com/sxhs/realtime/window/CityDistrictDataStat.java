@@ -149,7 +149,6 @@ public class CityDistrictDataStat {
                         cacheState.put(source, cache);
                     }
                 });
-        resultStream.print();
         SinkFunction<String> srSink = StarRocksSink.sink(
                 StarRocksSinkOptions.builder()
                         .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")

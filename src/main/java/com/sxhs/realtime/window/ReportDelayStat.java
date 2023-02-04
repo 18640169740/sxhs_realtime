@@ -1,10 +1,13 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
+import com.starrocks.connector.flink.StarRocksSink;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
@@ -18,12 +21,13 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 
 // 数据上报延迟事件统计任务
-public class SubmitDelayStat {
+public class ReportDelayStat {
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -82,7 +86,6 @@ public class SubmitDelayStat {
                 "from union_table as t1 " +
                 "left join client_data FOR SYSTEM_TIME AS OF t1.pt as t2 " +
                 "on t1.client_id=t2.client_id");
-        joinTable.execute().print();
 
         DataStream<Row> joinStream = tEnv.toAppendStream(joinTable, Row.class);
         SingleOutputStreamOperator<String> resultStream = joinStream.keyBy(row -> row.getField(0))
@@ -113,9 +116,8 @@ public class SubmitDelayStat {
                         if (cache == null) {
                             cache = new JSONObject();
                         }
-                        jsonObj.put("create_time", cache.get("create_time") == null ? cache.get("create_time") : row.getField(7));
-                        // TODO id
-                        jsonObj.put("id", cache.getLong("id") == null ? 123456l : cache.getLong("id"));
+                        jsonObj.put("create_time", cache.get("create_time") == null ? row.getField(7) : cache.get("create_time"));
+                        jsonObj.put("id", cache.getLong("id") == null ? SnowflakeIdWorker.generateId() : cache.getLong("id"));
                         int delaySum = (int) row.getField(4) + cache.getIntValue("delay_sum");
                         long delayCount = (long) row.getField(5) + cache.getLongValue("delayCount");
 
@@ -124,13 +126,31 @@ public class SubmitDelayStat {
                         cache.put("delay_sum", delaySum);
                         cache.put("delay_count", delayCount);
                         cacheState.update(cache);
-
                         // 计算平均值
                         jsonObj.put("delay_num", delaySum / delayCount);
-
+                        jsonObj.put("delay_type", "上报时间延迟");
                         return jsonObj.toJSONString();
                     }
                 });
+
+        SinkFunction<String> srSink = StarRocksSink.sink(
+                StarRocksSinkOptions.builder()
+                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
+                        .withProperty("load-url", "10.17.41.138:8030")
+                        .withProperty("database-name", "nuc_db")
+                        .withProperty("username", "huquan")
+                        .withProperty("password", "oNa46nj0o65b@kvK")
+                        .withProperty("table-name", "data_time_delay")
+                        .withProperty("sink.properties.format", "json")
+                        .withProperty("sink.properties.strip_outer_array", "true")
+                        // TODO 删除测试代码
+                        .withProperty("sink.buffer-flush.interval-ms", "1000")
+                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
+                        .withProperty("sink.parallelism", "1")
+                        .build()
+        );
+        resultStream.print();
+        resultStream.addSink(srSink);
 
         try {
             env.execute();

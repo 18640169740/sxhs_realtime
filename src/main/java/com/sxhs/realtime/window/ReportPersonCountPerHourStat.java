@@ -29,8 +29,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 // 小时维度上报人次统计任务
-public class ReportPersonCountPerHour {
-    private static final Logger logger = LoggerFactory.getLogger(ReportPersonCountPerHour.class);
+public class ReportPersonCountPerHourStat {
+    private static final Logger logger = LoggerFactory.getLogger(ReportPersonCountPerHourStat.class);
 
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -68,7 +68,7 @@ public class ReportPersonCountPerHour {
 
             @Override
             public void open(Configuration parameters) throws Exception {
-                ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("CollectAndReportTimeDifStat", JSONObject.class);
+                ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("ReportPersonCountPerHour", JSONObject.class);
                 StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
                         .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                         .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)

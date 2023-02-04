@@ -33,4 +33,5 @@ public class CollectDataId {
     private String interfaceRecTime;
     private String userName;
     private Long clientId;
+    private Integer dropDataNum;
 }

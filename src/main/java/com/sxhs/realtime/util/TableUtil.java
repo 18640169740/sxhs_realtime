@@ -41,6 +41,7 @@ public class TableUtil {
                 $("interfaceRecTime"),
                 $("userName"),
                 $("clientId"),
+                $("dropDataNum"),
                 $("pt").proctime());
     }
 
@@ -70,6 +71,7 @@ public class TableUtil {
                 $("interfaceRecTime"),
                 $("userName"),
                 $("clientId"),
+                $("dropDataNum"),
                 $("pt").proctime());
     }
 
@@ -101,6 +103,7 @@ public class TableUtil {
                 $("interfaceRecTime"),
                 $("userName"),
                 $("clientId"),
+                $("dropDataNum"),
                 $("pt").proctime());
     }
 
@@ -144,6 +147,7 @@ public class TableUtil {
                 $("interfaceRecTime"),
                 $("userName"),
                 $("clientId"),
+                $("dropDataNum"),
                 $("pt").proctime());
     }
 }

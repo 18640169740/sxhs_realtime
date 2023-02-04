@@ -32,7 +32,7 @@ public class HbaseUtil {
             return null;
         }
         try {
-            table = conn.getTable(TableName.valueOf("caches", "nuc_collect_distinct"));
+            table = conn.getTable(TableName.valueOf("default", "nuc_relation_distinct"));
             result = table.get(getList);
         } catch (IOException e) {
             logger.error("hbase search failed");
