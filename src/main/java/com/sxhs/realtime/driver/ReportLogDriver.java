@@ -1,53 +1,51 @@
 package com.sxhs.realtime.driver;
 
-import com.sxhs.realtime.bean.CommonDuplicateData;
+import com.starrocks.connector.flink.StarRocksSink;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.common.BaseJob;
-import com.sxhs.realtime.operator.CommonDuplicateDataToJson;
-import com.sxhs.realtime.operator.FlinkVariablePartitioner;
-import com.sxhs.realtime.operator.IdMappingByHbase;
-import com.sxhs.realtime.operator.JsonToCommonDuplicateData;
+import com.sxhs.realtime.common.Constants;
+import com.sxhs.realtime.operator.ReportLogProcess;
+import com.sxhs.realtime.operator.ReportStatProcess;
+import com.sxhs.realtime.util.JobUtils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 
 /**
- * @Description: 生成唯一性ID，相同数据ID相同
+ * @Description: 上报日志同步任务
  * @Author: zhangJunWei
- * @CreateTime: 2023/1/13 14:57
+ * @CreateTime: 2023/1/30 18:17
  */
-public class CommonAddIdDriver extends BaseJob {
-
+public class ReportLogDriver extends BaseJob {
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
             args = new String[]{
                     "--bootstrap.servers", "10.17.41.132:9092,10.17.41.133:9092,10.17.41.134:9092",
                     "--group.id", "zjw_test1",
-                    "--source.topic.name", "test1",
-                    "--sink.topic.name", "zjw_test",
+                    "--source.topic.name", "NUC_DATA_ZJW",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
-                    "--hbase.id.table", "nuc_id_distinct",
                     "--hbase.relation.table", "nuc_relation_distinct",
             };
         }
-
         //参数解析
         final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
         Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
         //设置全局参数
         env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
         //状态后端采用RocksDB/增量快照
-        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/zhangjunwei_common_id_mapping_jar", true));
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/zhangjunwei_report_log_jar", true));
         env.getConfig().isUseSnapshotCompression();
 
         //设置kafka参数
@@ -59,28 +57,27 @@ public class CommonAddIdDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
+//        DataStreamSource<String> kafkaSource = env.readTextFile("C:\\Users\\q4189\\Desktop\\test.txt");
 
-        //数据解析
-        DataStream<CommonDuplicateData> dataStream = kafkaSource.flatMap(new JsonToCommonDuplicateData()).name("dataPrase");
+        //日志统计
+        SingleOutputStreamOperator<String> dataStream = kafkaSource.process(new ReportLogProcess());
 
-        //数据id去重
-        dataStream = dataStream.keyBy(CommonDuplicateData::getType)
-                .process(new IdMappingByHbase()).name("idMapping")
-                .rebalance();
+        DataStream<String> uploadLogStream = dataStream.getSideOutput(Constants.UPLOAD_LOG_TAG);
+        DataStream<String> uploadLogFailStream = dataStream.getSideOutput(Constants.UPLOAD_LOG_FAIL_TAG);
+        DataStream<String> uploadReportStream = dataStream.getSideOutput(Constants.UPLOAD_REPORT_TAG);
+        DataStream<String> uploadReportFailStream = dataStream.getSideOutput(Constants.UPLOAD_REPORT_FAIL_TAG);
 
-        //将bean对象转成json字符串
-        DataStream<String> dataStrStream = dataStream.map(new CommonDuplicateDataToJson()).name("toJson");
+        SinkFunction<String> uploadLogSink = JobUtils.getStarrocksSink("upload_log");
+        SinkFunction<String> uploadLogFailSink = JobUtils.getStarrocksSink("upload_log_fail");
+        SinkFunction<String> uploadReportSink = JobUtils.getStarrocksSink("upload_report");
+        SinkFunction<String> uploadReportFailSink = JobUtils.getStarrocksSink("upload_report_fail");
 
-        FlinkKafkaProducer<String> producer = new FlinkKafkaProducer<String>(
-                parameterMap.get("sink.topic.name"),
-                new SimpleStringSchema(),
-                properties,
-                (Optional)Optional.of(new FlinkVariablePartitioner()));
+        //输出到starrocks
+        uploadLogStream.addSink(uploadLogSink);
+        uploadLogFailStream.addSink(uploadLogFailSink);
+        uploadReportStream.addSink(uploadReportSink);
+        uploadReportFailStream.addSink(uploadReportFailSink);
 
-        dataStrStream.addSink(producer);
-
-        env.execute("zhangjunwei_common_id_mapping_jar");
-
+        env.execute("zhangjunwei_report_log_jar");
     }
-
 }

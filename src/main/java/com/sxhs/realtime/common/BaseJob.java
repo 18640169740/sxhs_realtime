@@ -31,8 +31,8 @@ public abstract class BaseJob {
         //重启机制，失败率重启机制，3分钟内重试三次，每过10秒重试一次
         env.setRestartStrategy(RestartStrategies.failureRateRestart(3, Time.of(3, TimeUnit.MINUTES),
             Time.of(10, TimeUnit.SECONDS)));
-        //默认5分钟进行一次checkPoint
-        env.enableCheckpointing(5 * 60 * 1000);
+        //默认2分钟进行一次checkPoint
+        env.enableCheckpointing(2 * 60 * 1000);
         //获取checkpoint配置
         CheckpointConfig config = env.getCheckpointConfig();
         //精准一次处理

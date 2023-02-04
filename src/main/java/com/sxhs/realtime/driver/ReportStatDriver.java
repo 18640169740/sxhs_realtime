@@ -1,19 +1,24 @@
 package com.sxhs.realtime.driver;
 
+import com.alibaba.fastjson.JSONObject;
 import com.sxhs.realtime.bean.HourSumReportId;
-import com.sxhs.realtime.bean.TransportDataId;
 import com.sxhs.realtime.common.BaseJob;
 import com.sxhs.realtime.operator.JsonToHourSumReport;
+import com.sxhs.realtime.operator.ReportStatProcess;
+import com.sxhs.realtime.util.JobUtils;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
+import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -32,8 +37,7 @@ public class ReportStatDriver extends BaseJob {
                     "--source.topic.name", "NUC_DATA_ZJW",
                     "--hbase.zookeeper.quorum", "10.17.41.132:2181,10.17.41.133:2181,10.17.41.134:2181",
                     "--zookeeper.znode.parent", "/dqhbase",
-                    "--hbase.relation.table", "nuc_relation_distinct",
-                    "--hbase.check.table", "nuc_check_distinct",
+                    "--hbase.report.stat.table", "nuc_report_stat",
             };
         }
         //参数解析
@@ -54,9 +58,46 @@ public class ReportStatDriver extends BaseJob {
 //        input.setStartFromEarliest();
         //读取kafka数据
         DataStreamSource<String> kafkaSource = env.addSource(input);
-
+//        DataStreamSource<String> kafkaSource = env.readTextFile("C:\\Users\\q4189\\Desktop\\test.txt");
         //数据格式转换
         SingleOutputStreamOperator<HourSumReportId> dataStream = kafkaSource.flatMap(new JsonToHourSumReport());
+
+        //数据统计
+        DataStream<HourSumReportId> hourSumReportIdDataStream = dataStream.keyBy(new KeySelector<HourSumReportId, Tuple3<String,String,String>>() {
+            @Override
+            public Tuple3<String, String, String> getKey(HourSumReportId hourSumReportId) throws Exception {
+                return new Tuple3<>(hourSumReportId.getAreaId().toString(), hourSumReportId.getCollectDate(), String.valueOf(hourSumReportId.getUnitHour()));
+            }
+        }).process(new ReportStatProcess()).rebalance();
+
+        //格式转换
+        DataStream<String> strStream = hourSumReportIdDataStream.map(new MapFunction<HourSumReportId, String>() {
+            @Override
+            public String map(HourSumReportId hourSumReportId) throws Exception {
+                JSONObject jsonObj = new JSONObject();
+                jsonObj.put("create_time", hourSumReportId.getCreateTime());
+                jsonObj.put("area_id", hourSumReportId.getAreaId());
+                jsonObj.put("id", hourSumReportId.getId());
+                jsonObj.put("collect_date", hourSumReportId.getCollectDate());
+                jsonObj.put("unit_hour", hourSumReportId.getUnitHour());
+                jsonObj.put("collect_persons", hourSumReportId.getCollectPersons());
+                jsonObj.put("collect_sample_num", hourSumReportId.getCheckSampleNum());
+                jsonObj.put("transfer_persons", hourSumReportId.getTransferPersons());
+                jsonObj.put("transfer_sample_num", hourSumReportId.getTransferSampleNum());
+                jsonObj.put("receive_persons", hourSumReportId.getReceivePersons());
+                jsonObj.put("receive_sample_num", hourSumReportId.getReceiveSampleNum());
+                jsonObj.put("check_persons", hourSumReportId.getCheckPersons());
+                jsonObj.put("check_sample_num", hourSumReportId.getCheckSampleNum());
+                jsonObj.put("update_time", hourSumReportId.getUpdateTime());
+                jsonObj.put("is_delete", hourSumReportId.getIsDelete());
+                jsonObj.put("create_by", hourSumReportId.getCreateBy());
+                return jsonObj.toJSONString();
+            }
+        });
+
+        SinkFunction<String> sink = JobUtils.getStarrocksSink("hour_sum_report");
+
+        strStream.addSink(sink);
 
         env.execute("zhangjunwei_report_stat_jar");
 
