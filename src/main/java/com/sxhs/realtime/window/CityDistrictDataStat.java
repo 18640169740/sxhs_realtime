@@ -24,16 +24,9 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Result;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
 
 // 城市街道数据量统计任务
 public class CityDistrictDataStat {
@@ -61,9 +54,12 @@ public class CityDistrictDataStat {
 
         // 注册临时方法
         tEnv.createTemporarySystemFunction("upload_number", UploadNumberUdf.class);
+        tEnv.createTemporarySystemFunction("collect_check", CollectCheckUdf.class);
+        tEnv.createTemporarySystemFunction("report_check", ReportCheckUdf.class);
 
         // 对collect、transport、receive、report数据分别做开窗统计
         Table collectStat = _statCollect(tEnv);
+        // TODO transport和receive暂未做二次校验统计
         Table transportStat = _statTransport(tEnv);
         Table receiveState = _statReceive(tEnv);
         Table reportState = _statReport(tEnv);
@@ -80,7 +76,7 @@ public class CityDistrictDataStat {
                     @Override
                     public void open(Configuration parameters) throws Exception {
                         MapStateDescriptor<Integer, JSONObject> valueStateDescriptor = new MapStateDescriptor<>("CityDistrictDataStat", Integer.class, JSONObject.class);
-                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
+                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(48))
                                 .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                                 .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
                                 .build();
@@ -94,8 +90,7 @@ public class CityDistrictDataStat {
                         JSONObject result = new JSONObject();
                         JSONObject cache = cacheState.get(source);
                         if (cache == null) {
-                            // TODO 生成id
-                            result.put("id", "123456");
+                            result.put("id", SnowflakeIdWorker.generateId());
                             result.put("create_time", sdf.format(new Date()));
                             cache = new JSONObject();
                         } else {
@@ -108,8 +103,25 @@ public class CityDistrictDataStat {
                         result.put("upload_number", cache.getIntValue("upload_number"));
                         result.put("success_number", (long) row.getField(6) + cache.getLongValue("success_number"));
                         result.put("tube_number", (long) row.getField(8) + cache.getLongValue("tube_number"));
-                        result.put("problem_number", (int) row.getField(9) + cache.getIntValue("problem_number"));
-                        result.put("problem_number_report", (int) row.getField(10) + cache.getIntValue("problem_number_report"));
+
+                        // 二次检验
+                        String problem = (String) row.getField(9);
+                        int problemNumber = 0;
+                        int problemError = 0;
+                        int problemUnsync = 0;
+                        if (problem != null) {
+                            String[] s = problem.split(",", -1);
+                            if (s != null && s.length == 3) {
+                                problemNumber = Integer.valueOf(s[0]);
+                                problemError = Integer.valueOf(s[1]);
+                                problemUnsync = Integer.valueOf(s[2]);
+                            }
+                        }
+                        result.put("problem_number", problemNumber + cache.getIntValue("problem_number"));
+                        result.put("problem_error", problemError + cache.getIntValue("problem_error"));
+                        result.put("problem_unsync", problemUnsync + cache.getIntValue("problem_unsync"));
+
+                        result.put("problem_number_report", (long) row.getField(10) + cache.getLongValue("problem_number_report"));
                         result.put("problem_error", (int) row.getField(11) + cache.getIntValue("problem_error"));
                         result.put("problem_unsync", (int) row.getField(12) + cache.getIntValue("problem_unsync"));
 
@@ -145,8 +157,8 @@ public class CityDistrictDataStat {
                         }
                         collector.collect(result.toJSONString());
                         // 更新缓存
-                        cache = JSONObject.parseObject(result.toJSONString());
-                        cacheState.put(source, cache);
+//                        cache = JSONObject.parseObject(result.toJSONString());
+                        cacheState.put(source, result);
                     }
                 });
         SinkFunction<String> srSink = StarRocksSink.sink(
@@ -165,9 +177,10 @@ public class CityDistrictDataStat {
                         .withProperty("sink.parallelism", "1")
                         .build()
         );
+        resultStream.print("result");
         resultStream.addSink(srSink);
         try {
-            env.execute();
+            env.execute("huquan_CityDistrictDataStat");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -181,7 +194,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statReport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "md5(CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,cast(numberReport as string))) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(numberReport as string)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -191,7 +204,8 @@ public class CityDistrictDataStat {
                 "count(distinct CONCAT(cast(collectTime as string),personIdCard) ) success_number, " + // 不重复上传数量
                 "0 fail_number, " + // 环节对应数量:为空
                 "count(distinct tubeCode) tube_number, " +
-                "0 problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+//                "'0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+                "report_check(personIdCard, personName, personPhone, packTime, collectTime, receiveTime, checkTime, addTime, collectCount, collectLimitnum, tubeCode) problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
                 "numberReport problem_number_report, " +
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
@@ -215,7 +229,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statReceive(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "md5(CONCAT_WS('_',cast(areaId as string),cast(numberReport as string))) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(numberReport as string)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -224,7 +238,7 @@ public class CityDistrictDataStat {
                 "cast(0 as bigint) success_number, " + // 不重复上传数量
                 "0 fail_number, " + // 环节对应数量:为空
                 "cast(sum(tubeNum) as bigint) tube_number, " +
-                "0 problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+                "'0,0,0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
                 "numberReport problem_number_report, " +
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
@@ -247,7 +261,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statTransport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "md5(CONCAT_WS('_',cast(areaId as string),cast(numberReport as string))) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(numberReport as string)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -256,7 +270,7 @@ public class CityDistrictDataStat {
                 "cast(0 as bigint) success_number, " + // 不重复上传数量
                 "0 fail_number, " + // 环节对应数量:为空
                 "cast(sum(tubeNum) as bigint) tube_number, " +
-                "0 problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+                "'0,0,0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
                 "numberReport problem_number_report, " +
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
@@ -278,7 +292,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statCollect(StreamTableEnvironment tEnv) {
         String collectStatSql = "select " +
-                "md5(CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,cast(numberReport as string))) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(numberReport as string)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -289,10 +303,10 @@ public class CityDistrictDataStat {
                 "count(distinct tubeCode) tube_number, " +
 //                "problem_number_stat('1',personIdCard,personPhone,personName,collectCount,collectLimitnum," +
 //                "addTime,collectTime,'','','') problem_number, " +
-                "0 problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+                "collect_check(personName,personPhone,personIdCard,collectCount,collectLimitnum,addTime,collectTime,tubeCode) problem_number, " + // 有工单数据量(二次校验不通过数量)
                 "numberReport problem_number_report, " +
-                "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
-                "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
+                "0 problem_error, " + // 数据异常问题量(二次校验问题分组统计)。统一在problem_number中计算
+                "0 problem_unsync, " + // 环节不对应问题量(二次校验问题分组统计)。统一在problem_number中计算
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
                 "max(userName) create_by " + // 上传用户名(多个userName默认取第一个)
                 "from collect_data " +

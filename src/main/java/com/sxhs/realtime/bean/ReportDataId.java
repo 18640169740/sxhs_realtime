@@ -44,4 +44,21 @@ public class ReportDataId {
     private String userName;
     private Long clientId;
     private Integer dropDataNum;
+
+    public ReportDataId() {
+    }
+
+    public ReportDataId(String personIdCard, String personName, String personPhone, String packTime, String collectTime, String receiveTime, String checkTime, String addTime, Integer collectCount, Integer collectLimitnum, String tubeCode) {
+        this.personIdCard = personIdCard;
+        this.personName = personName;
+        this.personPhone = personPhone;
+        this.packTime = packTime;
+        this.collectTime = collectTime;
+        this.receiveTime = receiveTime;
+        this.checkTime = checkTime;
+        this.addTime = addTime;
+        this.collectCount = collectCount;
+        this.collectLimitnum = collectLimitnum;
+        this.tubeCode = tubeCode;
+    }
 }

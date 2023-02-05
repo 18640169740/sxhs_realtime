@@ -56,6 +56,11 @@ public class HbaseUtil {
         }
     }
 
+    public static Table getTable(String tableName) throws IOException {
+        return conn.getTable(TableName.valueOf(tableName));
+
+    }
+
 //    public static void searchAll() throws IOException {
 //        Table table = conn.getTable(TableName.valueOf("caches", "nuc_collect_distinct"));
 //        //得到用于扫描region的对象

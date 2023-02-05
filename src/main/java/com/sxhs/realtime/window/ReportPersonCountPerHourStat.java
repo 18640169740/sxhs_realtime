@@ -1,10 +1,13 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
+import com.starrocks.connector.flink.StarRocksSink;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import com.sxhs.realtime.util.UploadNumberUdf;
@@ -19,19 +22,16 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 // 小时维度上报人次统计任务
 public class ReportPersonCountPerHourStat {
-    private static final Logger logger = LoggerFactory.getLogger(ReportPersonCountPerHourStat.class);
-
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -83,8 +83,7 @@ public class ReportPersonCountPerHourStat {
                 JSONObject cache = cacheState.value();
                 if (cache == null) {
                     cache = new JSONObject();
-                    // TODO 生成id
-                    cache.put("id", 123456l);
+                    cache.put("id", SnowflakeIdWorker.generateId());
                     cache.put("create_time", sdf.format(new Date()));
                 }
                 result.put("id", cache.getLongValue("id"));
@@ -104,8 +103,24 @@ public class ReportPersonCountPerHourStat {
                 return result.toJSONString();
             }
         });
-
-        // TODO 入库
+        SinkFunction<String> srSink = StarRocksSink.sink(
+                StarRocksSinkOptions.builder()
+                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
+                        .withProperty("load-url", "10.17.41.138:8030")
+                        .withProperty("database-name", "nuc_db")
+                        .withProperty("username", "huquan")
+                        .withProperty("password", "oNa46nj0o65b@kvK")
+                        .withProperty("table-name", "upload_log_hour")
+                        .withProperty("sink.properties.format", "json")
+                        .withProperty("sink.properties.strip_outer_array", "true")
+                        // TODO 删除测试代码
+                        .withProperty("sink.buffer-flush.interval-ms", "1000")
+                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
+                        .withProperty("sink.parallelism", "1")
+                        .build()
+        );
+        resultStream.print("result");
+        resultStream.addSink(srSink);
         try {
             env.execute();
         } catch (Exception e) {

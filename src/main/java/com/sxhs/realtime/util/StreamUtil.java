@@ -42,20 +42,16 @@ public class StreamUtil {
                     if (type != null) {
                         switch (type) {
                             case "COLLECT_DATA":
-//                                collector.collect(JSONObject.parseObject(value, CollectDataId.class));
                                 _toCollectId(jsonObj, collector);
                                 break;
                             case "TRANSPORT_DATA":
-//                                ctx.output(transportTag, JSONObject.parseObject(value, TransportDataId.class));
                                 _toTransportId(jsonObj, ctx, transportTag);
                                 break;
                             case "RECEIVE_DATA":
-//                                ctx.output(receiveTag, JSONObject.parseObject(value, ReceiveDataId.class));
                                 _toReceiveId(jsonObj, ctx, receiveTag);
                                 break;
                             case "REPORT_DATA":
                             case "XA_REPORT_DATA":
-//                                ctx.output(reportTag, JSONObject.parseObject(value, ReportDataId.class));
                                 _toReportId(jsonObj, ctx, reportTag);
                                 break;
                             default:
@@ -66,6 +62,7 @@ public class StreamUtil {
                     }
                 } catch (Exception e) {
                     logger.error("json parse error: {}", value);
+                    e.printStackTrace();
                 }
             }
         });
@@ -81,7 +78,7 @@ public class StreamUtil {
         if (data != null && data.size() > 0) {
             for (int i = 0; i < data.size(); i++) {
                 JSONObject result = new JSONObject();
-                result.put("numberReport", json.get("numberReport"));
+                result.put("numberReport", json.getLong("numberReport"));
                 result.put("interfaceRecTime", json.get("interfaceRecTime"));
                 result.put("userName", json.get("userName"));
                 result.put("clientId", json.get("clientId"));
@@ -119,7 +116,7 @@ public class StreamUtil {
                 result.put("iggResult", jsonObj.get("iggResult"));
                 result.put("igmResult", jsonObj.get("igmResult"));
                 result.put("remark", jsonObj.get("remark"));
-                result.put("addTime", jsonObj.get("addTime"));
+                result.put("addTime", jsonObj.get("addtime"));
                 result.put("collectLimitnum", jsonObj.get("collectLimitnum"));
                 result.put("collectCount", jsonObj.get("collectCount"));
 
@@ -134,7 +131,7 @@ public class StreamUtil {
         if (data != null && data.size() > 0) {
             for (int i = 0; i < data.size(); i++) {
                 JSONObject result = new JSONObject();
-                result.put("numberReport", json.get("numberReport"));
+                result.put("numberReport", json.getLong("numberReport"));
                 result.put("interfaceRecTime", json.get("interfaceRecTime"));
                 result.put("userName", json.get("userName"));
                 result.put("clientId", json.get("clientId"));
@@ -175,7 +172,7 @@ public class StreamUtil {
         if (data != null && data.size() > 0) {
             for (int i = 0; i < data.size(); i++) {
                 JSONObject result = new JSONObject();
-                result.put("numberReport", json.get("numberReport"));
+                result.put("numberReport", json.getLong("numberReport"));
                 result.put("interfaceRecTime", json.get("interfaceRecTime"));
                 result.put("userName", json.get("userName"));
                 result.put("clientId", json.get("clientId"));
@@ -202,10 +199,9 @@ public class StreamUtil {
                 result.put("tubeCode", jsonObj.get("tubeCode"));
                 result.put("collectUser", jsonObj.get("collectUser"));
                 result.put("collectTime", jsonObj.get("collectTime"));
-                result.put("addTime", jsonObj.get("addtime"));
+                result.put("addTime", jsonObj.get("addTime"));
                 result.put("collectCount", jsonObj.get("collectCount"));
                 result.put("collectLimitnum", jsonObj.get("collectLimitnum"));
-
                 collector.collect(result.toJavaObject(CollectDataId.class));
             }
         }
@@ -216,7 +212,7 @@ public class StreamUtil {
         if (data != null && data.size() > 0) {
             for (int i = 0; i < data.size(); i++) {
                 JSONObject result = new JSONObject();
-                result.put("numberReport", json.get("numberReport"));
+                result.put("numberReport", json.getLong("numberReport"));
                 result.put("interfaceRecTime", json.get("interfaceRecTime"));
                 result.put("userName", json.get("userName"));
                 result.put("clientId", json.get("clientId"));
