@@ -1,39 +1,68 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.util.JobUtils;
 import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.StateTtlConfig;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 // 数据上报延迟事件统计任务
-public class ReportDelayStat {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+public class ReportDelayStat extends BaseJob {
+    public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_ReportDelayStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_ReportDelayStat", true));
+        env.getConfig().isUseSnapshotCompression();
 
-        DataStreamSource<String> sourceStream = env.socketTextStream("localhost", 7777);
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
@@ -81,7 +110,7 @@ public class ReportDelayStat {
                 "t1.data_delay_time, " +
                 "t1.delay_sum, " +
                 "t1.delay_count, " +
-                "t2.client_name report_client, " +
+                "if(t2.client_name=null,t2.client_name,'') report_client, " +
                 "t1.create_time create_time " +
                 "from union_table as t1 " +
                 "left join client_data FOR SYSTEM_TIME AS OF t1.pt as t2 " +
@@ -94,10 +123,8 @@ public class ReportDelayStat {
 
                     @Override
                     public void open(Configuration parameters) throws Exception {
-                        ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("SubmitDelayStat", JSONObject.class);
-//                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
-                        // TODO 删除测试代码
-                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.seconds(10))
+                        ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("ReportDelayStat", JSONObject.class);
+                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(48))
                                 .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                                 .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
                                 .build();
@@ -132,31 +159,11 @@ public class ReportDelayStat {
                         return jsonObj.toJSONString();
                     }
                 });
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("data_time_delay");
 
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "data_time_delay")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
-        resultStream.print();
         resultStream.addSink(srSink);
 
-        try {
-            env.execute();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        env.execute("huquan_ReportDelayStat");
     }
 
     private static Table _statReport(StreamTableEnvironment tEnv) {
@@ -177,10 +184,10 @@ public class ReportDelayStat {
                 "sum(timestampdiff(minute,to_timestamp(checkTime),LOCALTIMESTAMP)) delay_sum, " +
                 "count(1) delay_count, " +
                 "clientId client_id, " +
-                "LOCALTIMESTAMP create_time " +
+                "max(interfaceRecTime) create_time " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,clientId, " +
                 "concat(DATE_FORMAT(TIMESTAMPADD(HOUR,8,pt),'yyyy-MM-dd HH时'),DATE_FORMAT(TIMESTAMPADD(HOUR,9,pt),'-HH时'))" +
                 ") as t1");
@@ -204,10 +211,10 @@ public class ReportDelayStat {
                 "sum(timestampdiff(minute,to_timestamp(receiveTime),LOCALTIMESTAMP)) delay_sum, " +
                 "count(1) delay_count, " +
                 "clientId client_id, " +
-                "LOCALTIMESTAMP create_time " +
+                "max(interfaceRecTime) create_time " +
                 "from receive_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,clientId, " +
                 "concat(DATE_FORMAT(TIMESTAMPADD(HOUR,8,pt),'yyyy-MM-dd HH时'),DATE_FORMAT(TIMESTAMPADD(HOUR,9,pt),'-HH时'))" +
                 ") as t1");
@@ -231,10 +238,10 @@ public class ReportDelayStat {
                 "sum(timestampdiff(minute,to_timestamp(deliveryTime),LOCALTIMESTAMP)) delay_sum, " +
                 "count(1) delay_count, " +
                 "clientId client_id, " +
-                "LOCALTIMESTAMP create_time " +
+                "max(interfaceRecTime) create_time " +
                 "from transport_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,clientId, " +
                 "concat(DATE_FORMAT(TIMESTAMPADD(HOUR,8,pt),'yyyy-MM-dd HH时'),DATE_FORMAT(TIMESTAMPADD(HOUR,9,pt),'-HH时'))" +
                 ") as t1");
@@ -259,10 +266,10 @@ public class ReportDelayStat {
                 "sum(timestampdiff(minute,to_timestamp(collectTime),LOCALTIMESTAMP)) delay_sum, " +
                 "count(1) delay_count, " +
                 "clientId client_id, " +
-                "LOCALTIMESTAMP create_time " +
+                "max(interfaceRecTime) create_time " +
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,clientId, " +
                 "concat(DATE_FORMAT(TIMESTAMPADD(HOUR,8,pt),'yyyy-MM-dd HH时'),DATE_FORMAT(TIMESTAMPADD(HOUR,9,pt),'-HH时'))" +
                 ") as t1");

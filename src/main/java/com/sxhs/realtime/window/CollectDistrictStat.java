@@ -1,42 +1,70 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.util.JobUtils;
 import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.StateTtlConfig;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 // 采样点维度统计任务
-public class CollectDistrictStat {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+public class CollectDistrictStat extends BaseJob {
+    public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_CollectDistrictStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_CollectDistrictStat", true));
+        env.getConfig().isUseSnapshotCompression();
 
-        DataStreamSource<String> sourceStream = env.socketTextStream("localhost", 7777);
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
@@ -89,7 +117,6 @@ public class CollectDistrictStat {
                 "from union_table as t1 " +
                 "left join check_org FOR SYSTEM_TIME AS OF t1.pt as t2 " +
                 "on t1.org_name=t2.org_name");
-        joinTable.printSchema();
         DataStream<Row> joinStream = tEnv.toAppendStream(joinTable, Row.class);
 
         SingleOutputStreamOperator<String> resultStream = joinStream.keyBy(row -> row.getField(0))
@@ -99,9 +126,8 @@ public class CollectDistrictStat {
 
                     @Override
                     public void open(Configuration parameters) throws Exception {
-                        // TODO 修改其他任务缓存名
                         ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("CollectDistrictStat", JSONObject.class);
-                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
+                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(48))
                                 .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                                 .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
                                 .build();
@@ -137,34 +163,14 @@ public class CollectDistrictStat {
                         return result.toJSONString();
                     }
                 });
-
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "upload_log_org")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("upload_log_org");
         resultStream.addSink(srSink);
-        try {
-            env.execute();
-        } catch (Exception ignored) {
-        }
+        env.execute("huquan_CollectDistrictStat");
     }
-
 
     private static Table _unionStat(StreamTableEnvironment tEnv) {
         return tEnv.sqlQuery("select " +
-                "concat_ws('_',cast(areaId as string),collectOrgName,collectLocationDistrict,collectLocationName,'1') union_id, " +
+                "concat_ws('_',cast(areaId as string),collectOrgName,collectLocationDistrict,collectLocationName,'1',substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " +
                 "collectOrgName org_name, " +
                 "collectLocationName collect_location_name, " +
@@ -178,12 +184,12 @@ public class CollectDistrictStat {
                 "collectLocationDistrict collect_location_district " +
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,collectOrgName,collectLocationDistrict,collectLocationName,'1' " +
                 "union all " +
                 // transport
                 "select " +
-                "concat_ws('_',cast(areaId as string),transportOrgName,'',collectAddress,'2') union_id, " +
+                "concat_ws('_',cast(areaId as string),transportOrgName,'',collectAddress,'2',substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " +
                 "transportOrgName org_name, " +
                 "collectAddress collect_location_name, " +
@@ -197,12 +203,12 @@ public class CollectDistrictStat {
                 "'' collect_location_district " +
                 "from transport_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,transportOrgName,'',collectAddress,'2' " +
                 "union all " +
                 // receive
                 "select " +
-                "concat_ws('_',cast(areaId as string),receiveOrgName,'','','3') union_id, " +
+                "concat_ws('_',cast(areaId as string),receiveOrgName,'','','3',substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " +
                 "receiveOrgName org_name, " +
                 "'' collect_location_name, " +
@@ -216,12 +222,12 @@ public class CollectDistrictStat {
                 "'' collect_location_district " +
                 "from receive_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,receiveOrgName,'','','3' " +
                 "union all " +
                 // report
                 "select " +
-                "concat_ws('_',cast(areaId as string),checkOrgName,collectLocationDistrict,collectLocationName,'4') union_id, " +
+                "concat_ws('_',cast(areaId as string),checkOrgName,collectLocationDistrict,collectLocationName,'4',substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " +
                 "checkOrgName org_name, " +
                 "collectLocationName collect_location_name, " +
@@ -235,7 +241,7 @@ public class CollectDistrictStat {
                 "collectLocationDistrict collect_location_district " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId,checkOrgName,collectLocationDistrict,collectLocationName,'4' " +
                 "");
     }

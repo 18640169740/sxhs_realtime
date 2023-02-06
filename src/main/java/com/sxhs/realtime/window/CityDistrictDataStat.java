@@ -1,41 +1,68 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.common.BaseJob;
 import com.sxhs.realtime.util.*;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.StateTtlConfig;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 // 城市街道数据量统计任务
-public class CityDistrictDataStat {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+public class CityDistrictDataStat extends BaseJob {
+    public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_CityDistrictDataStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_CityDistrictDataStat", true));
+        env.getConfig().isUseSnapshotCompression();
 
-        DataStreamSource<String> sourceStream = env.socketTextStream("localhost", 7777);
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
@@ -161,29 +188,9 @@ public class CityDistrictDataStat {
                         cacheState.put(source, result);
                     }
                 });
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "upload_log_city")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
-        resultStream.print("result");
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("upload_log_city");
         resultStream.addSink(srSink);
-        try {
-            env.execute("huquan_CityDistrictDataStat");
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        env.execute("huquan_CityDistrictDataStat");
     }
 
     /**
@@ -194,7 +201,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statReport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(numberReport as string)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -204,16 +211,15 @@ public class CityDistrictDataStat {
                 "count(distinct CONCAT(cast(collectTime as string),personIdCard) ) success_number, " + // 不重复上传数量
                 "0 fail_number, " + // 环节对应数量:为空
                 "count(distinct tubeCode) tube_number, " +
-//                "'0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
-                "report_check(personIdCard, personName, personPhone, packTime, collectTime, receiveTime, checkTime, addTime, collectCount, collectLimitnum, tubeCode) problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
+                "report_check(personIdCard, personName, personPhone, packTime, collectTime, receiveTime, checkTime, addTime, collectCount, collectLimitnum, tubeCode) problem_number, " +
                 "numberReport problem_number_report, " +
-                "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
-                "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
+                "0 problem_error, " +
+                "0 problem_unsync, " +
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
                 "max(userName) create_by " + // 上传用户名(多个userName默认取第一个)
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
                 "collectLocationCity , " +
                 "collectLocationDistrict, " +
@@ -229,7 +235,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statReceive(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(numberReport as string)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -243,10 +249,10 @@ public class CityDistrictDataStat {
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
-                "max(userName) create_by " + // TODO 上传用户名(多个userName默认取第一个)
+                "max(userName) create_by " +
                 "from receive_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
                 "numberReport";
         return tEnv.sqlQuery(sql);
@@ -261,7 +267,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statTransport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(numberReport as string)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -278,7 +284,7 @@ public class CityDistrictDataStat {
                 "max(userName) create_by " + // 上传用户名(多个userName默认取第一个)
                 "from transport_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
                 "numberReport";
         return tEnv.sqlQuery(sql);
@@ -292,7 +298,7 @@ public class CityDistrictDataStat {
      */
     private static Table _statCollect(StreamTableEnvironment tEnv) {
         String collectStatSql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(numberReport as string)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -311,7 +317,7 @@ public class CityDistrictDataStat {
                 "max(userName) create_by " + // 上传用户名(多个userName默认取第一个)
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
                 "collectLocationCity , " +
                 "collectLocationDistrict, " +

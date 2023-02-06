@@ -9,6 +9,7 @@ import java.util.List;
 
 @Data
 public class HbaseAcc {
+    // TODO set
     private List<String> list = new ArrayList<>();
     private int batch = 50;
 
