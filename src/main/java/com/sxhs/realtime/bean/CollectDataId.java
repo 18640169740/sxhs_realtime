@@ -29,8 +29,23 @@ public class CollectDataId {
     private Integer collectLimitnum;
 
     // 统计计算用，生成id时需要保存下来，原始数据为String，转int
-    private Integer numberReport;
+    private Long numberReport;
     private String interfaceRecTime;
     private String userName;
     private Long clientId;
+    private Integer dropDataNum;
+
+    public CollectDataId() {
+    }
+
+    public CollectDataId(String personName, String personPhone, String personIdCard, Integer collectCount, Integer collectLimitnum, String addTime, String collectTime, String tubeCode) {
+        this.personName = personName;
+        this.personPhone = personPhone;
+        this.personIdCard = personIdCard;
+        this.collectCount = collectCount;
+        this.collectLimitnum = collectLimitnum;
+        this.addTime = addTime;
+        this.collectTime = collectTime;
+        this.tubeCode = tubeCode;
+    }
 }

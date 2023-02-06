@@ -23,12 +23,13 @@ public class ReceiveDataId {
     private Integer receiveOrgType;
     private String receivePrp;
     private String addTime;
-    private Integer numberReport;
     private Integer tubeNum;
     private Integer packNum;
     private TransportItem[] receivesItem;
-
+    private Integer numberReport;
     private String interfaceRecTime;
     private String userName;
     private Long clientId;
+    private Integer dropDataNum;
+
 }

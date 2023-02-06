@@ -1,28 +1,27 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
+import com.starrocks.connector.flink.StarRocksSink;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.state.StateTtlConfig;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 
+// 3.3.3.2.5各环节延迟统计任务
 public class DelayStat {
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -58,8 +57,7 @@ public class DelayStat {
         DataStream<Row> unionStream = tEnv.toAppendStream(unionTable, Row.class);
         SingleOutputStreamOperator<String> resultStream = unionStream.map((MapFunction<Row, String>) row -> {
             JSONObject jsonObj = new JSONObject();
-            // TODO id
-            jsonObj.put("id", 123l);
+            jsonObj.put("id", SnowflakeIdWorker.generateId());
             jsonObj.put("area_id", row.getField(0));
             jsonObj.put("source", row.getField(1));
             jsonObj.put("day_date", row.getField(2));
@@ -69,60 +67,24 @@ public class DelayStat {
             jsonObj.put("unit_minute", row.getField(6));
             return jsonObj.toJSONString();
         });
-        resultStream.print();
-//        SingleOutputStreamOperator<String> resultStream = unionStream.keyBy(row -> row.getField(0))
-//                .map(new RichMapFunction<Row, String>() {
-//                    private ValueState<JSONObject> cacheState;
-//
-//                    @Override
-//                    public void open(Configuration parameters) throws Exception {
-//                        ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("CollectAndReportTimeDifStat", JSONObject.class);
-//                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
-//                                .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
-//                                .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
-//                                .build();
-//                        valueStateDescriptor.enableTimeToLive(ttlConfig);
-//                        cacheState = getRuntimeContext().getState(valueStateDescriptor);
-//                    }
-//
-//                    @Override
-//                    public String map(Row row) throws Exception {
-//                        JSONObject cache = cacheState.value();
-//                        JSONObject jsonObj = new JSONObject();
-//                        long id, difCount;
-//                        String createTime;
-//                        int difTime;
-//                        if (cache == null) {
-//                            // TODO 生成id
-//                            id = 123456l;
-//                            difTime = (int) row.getField(5);
-//                            difCount = (long) row.getField(6);
-//                            createTime = (String) row.getField(7);
-//                        } else {
-//                            id = cache.getLongValue("id");
-//                            difTime = (int) row.getField(5) + cache.getIntValue("dif_time");
-//                            difCount = (long) row.getField(6) + cache.getIntValue("dif_count");
-//                            createTime = cache.getString("create_time");
-//                        }
-//                        jsonObj.put("id", id);
-//                        jsonObj.put("area_id", row.getField(1));
-//                        jsonObj.put("source", row.getField(2));
-//                        jsonObj.put("day_date", row.getField(3));
-//                        jsonObj.put("unit_hour", row.getField(4));
-//                        jsonObj.put("create_time", createTime);
-//                        jsonObj.put("unit_minute", row.getField(8));
-//
-//                        // 更新cache。cache中不直接保存avg，只保存dif_time和dif_count
-//                        cache = JSONObject.parseObject(jsonObj.toJSONString());
-//                        cache.put("dif_time", difTime);
-//                        cache.put("dif_count", difCount);
-//                        cacheState.update(cache);
-//
-//                        jsonObj.put("delay_avg", difTime / difCount);
-//                        return jsonObj.toJSONString();
-//                    }
-//                });
 
+        SinkFunction<String> srSink = StarRocksSink.sink(
+                StarRocksSinkOptions.builder()
+                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
+                        .withProperty("load-url", "10.17.41.138:8030")
+                        .withProperty("database-name", "nuc_db")
+                        .withProperty("username", "huquan")
+                        .withProperty("password", "oNa46nj0o65b@kvK")
+                        .withProperty("table-name", "delay_avg")
+                        .withProperty("sink.properties.format", "json")
+                        .withProperty("sink.properties.strip_outer_array", "true")
+                        // TODO 删除测试代码
+                        .withProperty("sink.buffer-flush.interval-ms", "1000")
+                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
+                        .withProperty("sink.parallelism", "1")
+                        .build()
+        );
+        resultStream.addSink(srSink);
         try {
             env.execute();
         } catch (Exception e) {
@@ -139,6 +101,7 @@ public class DelayStat {
                 "SUBSTRING(checkTime from 1 FOR 10) day_date, " +
                 "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) unit_hour, " +
                 "avg(timestampdiff(minute, TO_TIMESTAMP(checkTime), TO_TIMESTAMP(interfaceRecTime))) delay_avg, " +
+                // TODO 可以优化为当前时间
                 "max(interfaceRecTime) create_time, " +
                 "MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) unit_minute " +
                 "from report_data " +

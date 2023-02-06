@@ -30,5 +30,6 @@ public class TransportDataId {
     private String interfaceRecTime;
     private String userName;
     private Long clientId;
+    private Integer dropDataNum;
 
 }
