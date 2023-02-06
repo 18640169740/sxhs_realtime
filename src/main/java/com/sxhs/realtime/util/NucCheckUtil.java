@@ -70,20 +70,17 @@ public class NucCheckUtil {
         LocalDateTime pack = DateUtils.getDateTimeFromDate(dto.getPackTime());
         LocalDateTime receive = DateUtils.getDateTimeFromDate(dto.getReceiveTime());
         LocalDateTime checkTime = DateUtils.getDateTimeFromDate(dto.getCheckTime());
-        Duration du = Duration.between(collect, checkTime);
-        if (du.toMinutes() < 60) {
+        if (collect != null && checkTime != null &&Duration.between(collect, checkTime).toMinutes() < 60) {
             errorlist.add(setProblemCrFromData(dto, "6", "检测时间与采样时间间隔低于60分钟，不符合数据标准", 2, 0));
         }else{
             sucesslist.add(setProblemCrFromData(dto, "6", "检测时间与采样时间间隔低于60分钟，不符合数据标准", 2, 1));
         }
-        du = Duration.between(collect, pack);
-        if (du.toMinutes() < 2) {
+        if (collect != null && pack != null && Duration.between(collect, pack).toMinutes() < 2) {
             errorlist.add(setProblemCrFromData(dto, "6", "打包时间与采样时间间隔低于2分钟，不符合数据标准", 2, 0));
         }else{
             sucesslist.add(setProblemCrFromData(dto, "6", "打包时间与采样时间间隔低于2分钟，不符合数据标准", 2, 1));
         }
-        du = Duration.between(receive, checkTime);
-        if (du.toMinutes() < 20) {
+        if (receive != null && checkTime != null && Duration.between(receive, checkTime).toMinutes() < 20) {
             errorlist.add(setProblemCrFromData(dto, "6", "检测时间与接收时间间隔低于20分钟，不符合数据标准", 2, 0));
         }else{
             sucesslist.add(setProblemCrFromData(dto, "6", "检测时间与接收时间间隔低于20分钟，不符合数据标准", 2, 1));
