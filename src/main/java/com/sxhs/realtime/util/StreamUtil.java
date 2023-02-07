@@ -55,14 +55,13 @@ public class StreamUtil {
                                 _toReportId(jsonObj, ctx, reportTag);
                                 break;
                             default:
-                                logger.error("unknow type {}", type);
+//                                logger.error("unknow type {}", type);
                         }
                     } else {
                         logger.error("null type error: {}", value);
                     }
                 } catch (Exception e) {
                     logger.error("json parse error: {}", value);
-                    e.printStackTrace();
                 }
             }
         });
