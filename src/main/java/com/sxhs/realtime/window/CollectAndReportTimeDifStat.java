@@ -1,12 +1,12 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.util.JobUtils;
 import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
@@ -17,11 +17,12 @@ import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
@@ -29,25 +30,40 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
-import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 // 采检时间差统计任务
-public class CollectAndReportTimeDifStat {
+public class CollectAndReportTimeDifStat extends BaseJob {
     public static void main(String[] args) throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_CollectAndReportTimeDifStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_CollectAndReportTimeDifStat", true));
+        env.getConfig().isUseSnapshotCompression();
+
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-        // TODO 删除测试代码
-        Properties properties = new Properties();
-//        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "10.17.41.132:9092,10.17.41.133:9092,10.17.41.134:9092");
-        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "test-huq");
-//        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>("NUC_DATA_ID", new SimpleStringSchema(), properties);
-        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>("sxhs_NUC_DATA_ID", new SimpleStringSchema(), properties);
-        input.setStartFromEarliest();
-        DataStreamSource<String> sourceStream = env.addSource(input);
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
         Table reportDataTable = TableUtil.reportTable(tEnv, streams.f3);
         tEnv.createTemporaryView("report_data", reportDataTable);
@@ -60,14 +76,13 @@ public class CollectAndReportTimeDifStat {
                 "max(interfaceRecTime) interfaceRecTime " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "TIMESTAMPDIFF(HOUR,TO_TIMESTAMP(collectTime),TO_TIMESTAMP(checkTime)), " +
                 "areaId");
         DataStream<Row> statStream = tEnv.toAppendStream(statTable, Row.class);
         SingleOutputStreamOperator<String> resultStream = statStream.keyBy(row -> row.getField(0))
                 .map(new RichMapFunction<Row, String>() {
                     private ValueState<JSONObject> cacheState;
-                    private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
                     @Override
                     public void open(Configuration parameters) throws Exception {
@@ -101,24 +116,9 @@ public class CollectAndReportTimeDifStat {
                     }
                 });
 
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "upload_log_checkhour")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
+
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("upload_log_checkhour");
         resultStream.addSink(srSink);
-        resultStream.print("result");
         env.execute("huquan_CollectAndReportTimeDifStat");
     }
 }

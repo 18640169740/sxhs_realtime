@@ -7,34 +7,62 @@ import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
-import com.sxhs.realtime.util.SnowflakeIdWorker;
-import com.sxhs.realtime.util.StreamUtil;
-import com.sxhs.realtime.util.TableUtil;
-import com.sxhs.realtime.util.UploadNumberUdf;
+import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.util.*;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
-public class ReportPersonTodayStat {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
+//3.3.3.2.6当天内记录的上报与人次统计任务
+public class ReportPersonTodayStat extends BaseJob {
+    public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_ReportPersonTodayStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_ReportPersonTodayStat", true));
+        env.getConfig().isUseSnapshotCompression();
+
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
-        DataStreamSource<String> sourceStream = env.socketTextStream("localhost", 7777);
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
@@ -65,7 +93,7 @@ public class ReportPersonTodayStat {
                         ValueStateDescriptor<JSONObject> valueStateDescriptor = new ValueStateDescriptor<>("ReportPersonTodayStatMapValue", JSONObject.class);
                         MapStateDescriptor<String, JSONObject> mapStateDescriptor = new MapStateDescriptor<>("ReportPersonTodayStatMap", String.class, JSONObject.class);
 
-                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(24))
+                        StateTtlConfig ttlConfig = StateTtlConfig.newBuilder(Time.hours(48))
                                 .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
                                 .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
                                 .build();
@@ -129,30 +157,10 @@ public class ReportPersonTodayStat {
                         return result.toJSONString();
                     }
                 });
-        resultStream.print(">>>");
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "upload_log_time")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
-        resultStream.addSink(srSink);
 
-        try {
-            env.execute();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("upload_log_time");
+        resultStream.addSink(srSink);
+        env.execute("huquan_ReportPersonTodayStat");
     }
 
     private static Table _statData(StreamTableEnvironment tEnv) {
@@ -169,7 +177,7 @@ public class ReportPersonTodayStat {
                 "max(dropDataNum) drop_data_num " +
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId " +
                 "union all " +
                 "select " +
@@ -185,7 +193,7 @@ public class ReportPersonTodayStat {
                 "max(dropDataNum) drop_data_num " +
                 "from transport_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId " +
                 "union all " +
                 "select " +
@@ -201,7 +209,7 @@ public class ReportPersonTodayStat {
                 "max(dropDataNum) drop_data_num " +
                 "from receive_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId " +
                 "union all " +
                 "select " +
@@ -217,7 +225,7 @@ public class ReportPersonTodayStat {
                 "max(dropDataNum) drop_data_num " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' SECOND), " +
+                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId ");
     }
 }

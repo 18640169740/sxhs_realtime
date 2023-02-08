@@ -1,34 +1,63 @@
 package com.sxhs.realtime.window;
 
 import com.alibaba.fastjson.JSONObject;
-import com.starrocks.connector.flink.StarRocksSink;
-import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.sxhs.realtime.bean.CollectDataId;
 import com.sxhs.realtime.bean.ReceiveDataId;
 import com.sxhs.realtime.bean.ReportDataId;
 import com.sxhs.realtime.bean.TransportDataId;
+import com.sxhs.realtime.common.BaseJob;
+import com.sxhs.realtime.util.JobUtils;
 import com.sxhs.realtime.util.SnowflakeIdWorker;
 import com.sxhs.realtime.util.StreamUtil;
 import com.sxhs.realtime.util.TableUtil;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 // 3.3.3.2.5各环节延迟统计任务
-public class DelayStat {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+public class DelayStat extends BaseJob {
+    public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            args = new String[]{
+                    "--bootstrap.servers", "10.17.41.132:9091,10.17.41.133:9091,10.17.41.134:9091",
+                    "--group.id", "huquan_DelayStat",
+                    "--source.topic.name", "NUC_DATA_ID"
+            };
+        }
+        //参数解析
+        final ParameterTool parameterToolold = ParameterTool.fromArgs(args);
+        Map<String, String> parameterMap = new HashMap<>(parameterToolold.toMap());
+        //设置全局参数
+        env.getConfig().setGlobalJobParameters(ParameterTool.fromMap(parameterMap));
+        //状态后端采用RocksDB/增量快照
+        env.setStateBackend(new RocksDBStateBackend("hdfs://NSBD/warehouse_bigdata/realtimecompute/rtcalc/huquan_DelayStat", true));
+        env.getConfig().isUseSnapshotCompression();
 
-        DataStreamSource<String> sourceStream = env.socketTextStream("localhost", 7777);
+        //设置kafka参数
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parameterMap.get("bootstrap.servers"));
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, parameterMap.get("group.id"));
+        FlinkKafkaConsumer<String> input = new FlinkKafkaConsumer<>(parameterMap.get("source.topic.name"), new SimpleStringSchema(), properties);
+        input.setStartFromGroupOffsets();
+
+        //读取kafka数据
+        DataStreamSource<String> sourceStream = env.addSource(input);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // 侧输出流，将kafka数据分离，collect、transport、receive、report
         Tuple4<SingleOutputStreamOperator<CollectDataId>, DataStream<TransportDataId>, DataStream<ReceiveDataId>, DataStream<ReportDataId>> streams = StreamUtil.sideOutput(sourceStream);
@@ -55,6 +84,7 @@ public class DelayStat {
                 .unionAll(receiveState)
                 .unionAll(reportState);
         DataStream<Row> unionStream = tEnv.toAppendStream(unionTable, Row.class);
+        // TODO 在统计中直接生成
         SingleOutputStreamOperator<String> resultStream = unionStream.map((MapFunction<Row, String>) row -> {
             JSONObject jsonObj = new JSONObject();
             jsonObj.put("id", SnowflakeIdWorker.generateId());
@@ -67,103 +97,81 @@ public class DelayStat {
             jsonObj.put("unit_minute", row.getField(6));
             return jsonObj.toJSONString();
         });
-
-        SinkFunction<String> srSink = StarRocksSink.sink(
-                StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
-                        .withProperty("load-url", "10.17.41.138:8030")
-                        .withProperty("database-name", "nuc_db")
-                        .withProperty("username", "huquan")
-                        .withProperty("password", "oNa46nj0o65b@kvK")
-                        .withProperty("table-name", "delay_avg")
-                        .withProperty("sink.properties.format", "json")
-                        .withProperty("sink.properties.strip_outer_array", "true")
-                        // TODO 删除测试代码
-                        .withProperty("sink.buffer-flush.interval-ms", "1000")
-                        // 设置并行度，多并行度情况下需要考虑如何保证数据有序性
-                        .withProperty("sink.parallelism", "1")
-                        .build()
-        );
+        SinkFunction<String> srSink = JobUtils.getStarrocksSink("delay_avg");
         resultStream.addSink(srSink);
-        try {
-            env.execute();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        env.execute("huquan_DelayStat");
 
     }
 
     private static Table _statReport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-//                "concat_ws('_',cast(areaId as string),'1',SUBSTRING(checkTime from 1 FOR 10),cast(HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) as string),cast(MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) as string)) union_id, " +
                 "areaId area_id," +
                 "4 source, " +
-                "SUBSTRING(checkTime from 1 FOR 10) day_date, " +
-                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) unit_hour, " +
+                "SUBSTRING(max(checkTime) from 1 FOR 10) day_date, " +
+                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' MINUTE))) unit_hour, " +
                 "avg(timestampdiff(minute, TO_TIMESTAMP(checkTime), TO_TIMESTAMP(interfaceRecTime))) delay_avg, " +
-                // TODO 可以优化为当前时间
                 "max(interfaceRecTime) create_time, " +
-                "MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) unit_minute " +
+                "MINUTE(TUMBLE_START(pt,INTERVAL '10' MINUTE)) unit_minute " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '10' SECOND), " +
+                "TUMBLE(pt, INTERVAL '10' MINUTE), " +
                 // 按处理时间开床10分钟，窗口内数据的unit_hour，unit_minute相同，无需再分组
-                "areaId,checkTime";
+                "areaId," +
+                "substring(interfaceRecTime from 0 for 9)";
         return tEnv.sqlQuery(sql);
     }
 
     private static Table _statReceive(StreamTableEnvironment tEnv) {
         String sql = "select " +
-//                "concat_ws('_',cast(areaId as string),'1',SUBSTRING(receiveTime from 1 FOR 10),cast(HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) as string),cast(MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) as string)) union_id, " +
                 "areaId area_id," +
                 "3 source, " +
-                "SUBSTRING(receiveTime from 1 FOR 10) day_date, " +
-                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) unit_hour, " +
+                "SUBSTRING(max(receiveTime) from 1 FOR 10) day_date, " +
+                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' MINUTE))) unit_hour, " +
                 "avg(timestampdiff(minute, TO_TIMESTAMP(receiveTime), TO_TIMESTAMP(interfaceRecTime))) delay_avg, " +
                 "max(interfaceRecTime) create_time, " +
-                "MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) unit_minute " +
+                "MINUTE(TUMBLE_START(pt,INTERVAL '10' MINUTE)) unit_minute " +
                 "from receive_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '10' SECOND), " +
+                "TUMBLE(pt, INTERVAL '10' MINUTE), " +
                 // 按处理时间开床10分钟，窗口内数据的unit_hour，unit_minute相同，无需再分组
-                "areaId,receiveTime";
+                "areaId," +
+                "substring(interfaceRecTime from 0 for 9)";
         return tEnv.sqlQuery(sql);
     }
 
     private static Table _statTransport(StreamTableEnvironment tEnv) {
-        // TODO 暂取deliveryTime（交付时间）
         String sql = "select " +
-//                "concat_ws('_',cast(areaId as string),'1',SUBSTRING(deliveryTime from 1 FOR 10),cast(HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) as string),cast(MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) as string)) union_id, " +
                 "areaId area_id," +
                 "2 source, " +
-                "SUBSTRING(deliveryTime from 1 FOR 10) day_date, " +
-                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) unit_hour, " +
+                "SUBSTRING(max(deliveryTime) from 1 FOR 10) day_date, " +
+                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' MINUTE))) unit_hour, " +
                 "avg(timestampdiff(minute, TO_TIMESTAMP(deliveryTime), TO_TIMESTAMP(interfaceRecTime))) delay_avg, " +
                 "max(interfaceRecTime) create_time, " +
-                "MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) unit_minute " +
+                "MINUTE(TUMBLE_START(pt,INTERVAL '10' MINUTE)) unit_minute " +
                 "from transport_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '10' SECOND), " +
+                "TUMBLE(pt, INTERVAL '10' MINUTE), " +
                 // 按处理时间开床10分钟，窗口内数据的unit_hour，unit_minute相同，无需再分组
-                "areaId,deliveryTime";
+                "areaId," +
+                "substring(interfaceRecTime from 0 for 9)";
         return tEnv.sqlQuery(sql);
     }
 
     private static Table _statCollect(StreamTableEnvironment tEnv) {
         String sql = "select " +
-//                "concat_ws('_',cast(areaId as string),'1',SUBSTRING(collectTime from 1 FOR 10),cast(HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) as string),cast(MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) as string)) union_id, " +
                 "areaId area_id," +
                 "1 source, " +
-                "SUBSTRING(collectTime from 1 FOR 10) day_date, " +
-                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' SECOND))) unit_hour, " +
+                "SUBSTRING(max(collectTime) from 1 FOR 10) day_date, " +
+                "HOUR(TIMESTAMPADD(HOUR, 8,TUMBLE_START(pt,INTERVAL '10' MINUTE))) unit_hour, " +
                 "avg(timestampdiff(minute, TO_TIMESTAMP(collectTime), TO_TIMESTAMP(interfaceRecTime))) delay_avg, " +
                 "max(interfaceRecTime) create_time, " +
-                "MINUTE(TUMBLE_START(pt,INTERVAL '10' SECOND)) unit_minute " +
+                "MINUTE(TUMBLE_START(pt,INTERVAL '10' MINUTE)) unit_minute " +
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '10' SECOND), " +
-                // 按处理时间开床10分钟，窗口内数据的unit_hour，unit_minute相同，无需再分组
-                "areaId,collectTime";
+                "TUMBLE(pt, INTERVAL '10' MINUTE), " +
+                // 按处理时间开窗10分钟，窗口内数据的unit_hour，unit_minute相同，无需再分组
+                "areaId," +
+                "substring(interfaceRecTime from 0 for 9)";
         return tEnv.sqlQuery(sql);
     }
 }
