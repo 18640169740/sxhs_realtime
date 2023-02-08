@@ -173,15 +173,11 @@ public class ReportLogProcess extends ProcessFunction<String,String> {
         uploadLog.setCreate_by(createBy);
         uploadLog.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         uploadLog.setIs_delete(0);
-        JSONObject object = (JSONObject)JSONObject.toJSON(uploadLog);
-        if(object.get("fail_number") == null){
-            object.put("fail_number",0);
-        }
         if(uploadLog.getArea_id() == null || StringUtils.isBlank(uploadLog.getNumber_report())
         || uploadLog.getSource() == null || uploadLog.getUpload_number() == 0 || StringUtils.isBlank(uploadLog.getUpload_time())){
-            context.output(Constants.UPLOAD_LOG_FAIL_TAG,object.toJSONString());
+            context.output(Constants.UPLOAD_LOG_FAIL_TAG,JSONObject.toJSONString(uploadLog));
         }else{
-            context.output(Constants.UPLOAD_LOG_TAG,object.toJSONString());
+            context.output(Constants.UPLOAD_LOG_TAG,JSONObject.toJSONString(uploadLog));
         }
 
         if(areaId == null || source == null || StringUtils.isBlank(recordId) || StringUtils.isBlank(numberReport)){
