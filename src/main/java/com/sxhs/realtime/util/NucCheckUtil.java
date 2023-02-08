@@ -15,14 +15,14 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * @Description: æ ¸é…¸æ ¡éªŒ
+ * @Description: ºËËáĞ£Ñé
  * @Author: zhangJunWei
  * @CreateTime: 2023/1/30 14:14
  */
 public class NucCheckUtil {
 
     /**
-     * æ£€æµ‹ç¯èŠ‚äºŒæ¬¡æ ¡éªŒ
+     * ¼ì²â»·½Ú¶ş´ÎĞ£Ñé
      * @param dto
      * @param relationTable
      * @return
@@ -32,82 +32,82 @@ public class NucCheckUtil {
         ParamCheck check = new ParamCheck();
         List<ProblemDataCr> errorlist = new ArrayList<>();
         List<ProblemDataCr> sucesslist = new ArrayList<>();
-        //æ•°æ®å†…å®¹æ ¼å¼æ ¡éªŒ
+        //Êı¾İÄÚÈİ¸ñÊ½Ğ£Ñé
         String idCard = AESUtil.decrypt(dto.getPersonIdCard());
         String name = AESUtil.decrypt(dto.getPersonName());
         String phone = AESUtil.decrypt(dto.getPersonPhone());
         if (check.checkNotHaveString(idCard) || !check.checkIdCard(idCard)) {
-            errorlist.add(setProblemCrFromData(dto, "1", "èº«ä»½è¯å·ä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "1", "Éí·İÖ¤ºÅ²»·ûºÏ±ê×¼¸ñÊ½", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "1", "èº«ä»½è¯å·ä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "1", "Éí·İÖ¤ºÅ²»·ûºÏ±ê×¼¸ñÊ½", 2, 1));
         }
         if (check.checkNotHaveString(phone) || !check.checkPhone(phone)) {
-            errorlist.add(setProblemCrFromData(dto, "3", "ç”µè¯å·ç ä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "3", "µç»°ºÅÂë²»·ûºÏ±ê×¼¸ñÊ½", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "3", "ç”µè¯å·ç ä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "3", "µç»°ºÅÂë²»·ûºÏ±ê×¼¸ñÊ½", 2, 1));
         }
         if (check.checkNotHaveString(name)) {
-            errorlist.add(setProblemCrFromData(dto, "2", "å§“åä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "2", "ĞÕÃû²»·ûºÏ±ê×¼¸ñÊ½", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "2", "å§“åä¸ç¬¦åˆæ ‡å‡†æ ¼å¼", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "2", "ĞÕÃû²»·ûºÏ±ê×¼¸ñÊ½", 2, 1));
         }
         if (StringUtils.isNotBlank(dto.getPackTime()) && dto.getPackTime().compareTo(dto.getCollectTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "´ò°üÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "´ò°üÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 1));
         }
         if (StringUtils.isNotBlank(dto.getReceiveTime()) && dto.getReceiveTime().compareTo(dto.getCollectTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ¥æ”¶æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "½ÓÊÕÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ¥æ”¶æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "½ÓÊÕÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 1));
         }
         if (StringUtils.isNotBlank(dto.getCheckTime()) && dto.getCheckTime().compareTo(dto.getCollectTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 1));
         }
         LocalDateTime collect = DateUtils.getDateTimeFromDate(dto.getCollectTime());
         LocalDateTime pack = DateUtils.getDateTimeFromDate(dto.getPackTime());
         LocalDateTime receive = DateUtils.getDateTimeFromDate(dto.getReceiveTime());
         LocalDateTime checkTime = DateUtils.getDateTimeFromDate(dto.getCheckTime());
         if (collect != null && checkTime != null &&Duration.between(collect, checkTime).toMinutes() < 60) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”ä½äº60åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ôµÍÓÚ60·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”ä½äº60åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ôµÍÓÚ60·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 1));
         }
         if (collect != null && pack != null && Duration.between(collect, pack).toMinutes() < 2) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”ä½äº2åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "´ò°üÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ôµÍÓÚ2·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”ä½äº2åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "´ò°üÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ôµÍÓÚ2·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 1));
         }
         if (receive != null && checkTime != null && Duration.between(receive, checkTime).toMinutes() < 20) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸æ¥æ”¶æ—¶é—´é—´éš”ä½äº20åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë½ÓÊÕÊ±¼ä¼ä¸ôµÍÓÚ20·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸æ¥æ”¶æ—¶é—´é—´éš”ä½äº20åˆ†é’Ÿï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë½ÓÊÕÊ±¼ä¼ä¸ôµÍÓÚ20·ÖÖÓ£¬²»·ûºÏÊı¾İ±ê×¼", 2, 1));
         }
         if (Objects.nonNull(dto.getPackTime()) && dto.getCheckTime().compareTo(dto.getPackTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºæ‰“åŒ…æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ´ò°üÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºæ‰“åŒ…æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ´ò°üÊ±¼ä", 2, 1));
         }
         if (Objects.nonNull(dto.getCheckTime()) && dto.getAddTime().compareTo(dto.getCheckTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "ä¸ŠæŠ¥æ—¶é—´ä¸åº”æ—©äºæ£€æµ‹æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "ÉÏ±¨Ê±¼ä²»Ó¦ÔçÓÚ¼ì²âÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "ä¸ŠæŠ¥æ—¶é—´ä¸åº”æ—©äºæ£€æµ‹æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "ÉÏ±¨Ê±¼ä²»Ó¦ÔçÓÚ¼ì²âÊ±¼ä", 2, 1));
         }
         if (Objects.nonNull(dto.getReceiveTime()) && dto.getCheckTime().compareTo(dto.getReceiveTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºæ¥æ”¶æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ½ÓÊÕÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸åº”æ—©äºæ¥æ”¶æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼ä²»Ó¦ÔçÓÚ½ÓÊÕÊ±¼ä", 2, 1));
         }
         if ((Objects.isNull(dto.getCollectCount()) && dto.getCollectCount() == 0)
                 || Objects.isNull(dto.getCollectLimitnum()) && dto.getCollectLimitnum() == 0) {
-            errorlist.add(setProblemCrFromData(dto, "7", "æ­¤æ•°æ®é‡Œè¯•ç®¡æ ·æœ¬æ•°ä¸ºç©ºæˆ–ä¸º0", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "7", "´ËÊı¾İÀïÊÔ¹ÜÑù±¾ÊıÎª¿Õ»òÎª0", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "7", "æ­¤æ•°æ®é‡Œè¯•ç®¡æ ·æœ¬æ•°ä¸ºç©ºæˆ–ä¸º0", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "7", "´ËÊı¾İÀïÊÔ¹ÜÑù±¾ÊıÎª¿Õ»òÎª0", 2, 1));
         }
-        //æ•°æ®ç¯èŠ‚å¯¹åº”æ ¡éªŒ
-        //ä»hbaseæ‹‰å–æ•°æ®
+        //Êı¾İ»·½Ú¶ÔÓ¦Ğ£Ñé
+        //´ÓhbaseÀ­È¡Êı¾İ
         StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
         sj.add(dto.getPersonIdCard());
         sj.add(dto.getTubeCode());
@@ -116,25 +116,25 @@ public class NucCheckUtil {
         Result result = relationTable.get(get);
         String collectTime = Bytes.toString(result.getValue(Constants.HBASE_FAMILY, "collectTime".getBytes()));
         if (StringUtils.isBlank(collectTime)) {
-            errorlist.add(setProblemCrFromData(dto, "5", "è¯¥æ£€æµ‹ç»“æœæ•°æ®æ— å¯¹åº”çš„é‡‡æ ·æ•°æ®", 1, 0));
+            errorlist.add(setProblemCrFromData(dto, "5", "¸Ã¼ì²â½á¹ûÊı¾İÎŞ¶ÔÓ¦µÄ²ÉÑùÊı¾İ", 1, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "5", "è¯¥æ£€æµ‹ç»“æœæ•°æ®æ— å¯¹åº”çš„é‡‡æ ·æ•°æ®", 1, 1));
+            sucesslist.add(setProblemCrFromData(dto, "5", "¸Ã¼ì²â½á¹ûÊı¾İÎŞ¶ÔÓ¦µÄ²ÉÑùÊı¾İ", 1, 1));
             if (dto.getCollectTime().compareTo(dto.getCheckTime()) > 0) {
-                errorlist.add(setProblemCrFromData(dto, "6", "é‡‡æ ·æ—¶é—´ä¸åº”æ™šäºæ£€æµ‹æ—¶é—´", 2, 0));
+                errorlist.add(setProblemCrFromData(dto, "6", "²ÉÑùÊ±¼ä²»Ó¦ÍíÓÚ¼ì²âÊ±¼ä", 2, 0));
             }else{
-                sucesslist.add(setProblemCrFromData(dto, "6", "é‡‡æ ·æ—¶é—´ä¸åº”æ™šäºæ£€æµ‹æ—¶é—´", 2, 1));
+                sucesslist.add(setProblemCrFromData(dto, "6", "²ÉÑùÊ±¼ä²»Ó¦ÍíÓÚ¼ì²âÊ±¼ä", 2, 1));
             }
             if (collect.isBefore(checkTime.minusHours(24))) {
-                errorlist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”è¶…24å°æ—¶", 2, 0));
+                errorlist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ô³¬24Ğ¡Ê±", 2, 0));
             }else{
-                sucesslist.add(setProblemCrFromData(dto, "6", "æ£€æµ‹æ—¶é—´ä¸é‡‡æ ·æ—¶é—´é—´éš”è¶…24å°æ—¶", 2, 1));
+                sucesslist.add(setProblemCrFromData(dto, "6", "¼ì²âÊ±¼äÓë²ÉÑùÊ±¼ä¼ä¸ô³¬24Ğ¡Ê±", 2, 1));
             }
         }
         return new Tuple2<>(errorlist,sucesslist);
     }
 
     /**
-     * æ¥æ”¶ç¯èŠ‚äºŒæ¬¡æ ¡éªŒ
+     * ½ÓÊÕ»·½Ú¶ş´ÎĞ£Ñé
      * @param dto
      * @param relationTable
      * @return
@@ -144,34 +144,34 @@ public class NucCheckUtil {
         List<ProblemDataTre> errorlist = new ArrayList<>();
         List<ProblemDataTre> sucesslist = new ArrayList<>();
         ParamCheck check = new ParamCheck();
-        //æ•°æ®å†…å®¹æ ¼å¼æ ¡éªŒ
-        //æ£€æŸ¥æ ¼å¼å‰å…ˆè§£å¯†
+        //Êı¾İÄÚÈİ¸ñÊ½Ğ£Ñé
+        //¼ì²é¸ñÊ½Ç°ÏÈ½âÃÜ
         String deliPhone = AESUtil.decrypt(dto.getDeliveryPrpPhone());
         String deliId = AESUtil.decrypt(dto.getDeliveryPrpId());
         String trPhone = AESUtil.decrypt(dto.getTransportPrpPhone());
         String trId = AESUtil.decrypt(dto.getTransportPrpId());
         if (!check.checkIdCard(deliId)) {
-            errorlist.add(createProblemDataTre(dto, "1", "äº¤ä»˜äººè¯ä»¶å·é•¿åº¦æœ‰è¯¯/å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 0));
+            errorlist.add(createProblemDataTre(dto, "1", "½»¸¶ÈËÖ¤¼şºÅ³¤¶ÈÓĞÎó/º¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 0));
         }else{
-            sucesslist.add(createProblemDataTre(dto, "1", "äº¤ä»˜äººè¯ä»¶å·é•¿åº¦æœ‰è¯¯/å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 1));
+            sucesslist.add(createProblemDataTre(dto, "1", "½»¸¶ÈËÖ¤¼şºÅ³¤¶ÈÓĞÎó/º¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 1));
         }
         if (!check.checkPhone(deliPhone)) {
-            errorlist.add(createProblemDataTre(dto, "2", "äº¤ä»˜äººæ‰‹æœºå·å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 0));
+            errorlist.add(createProblemDataTre(dto, "2", "½»¸¶ÈËÊÖ»úºÅº¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 0));
         }else{
-            sucesslist.add(createProblemDataTre(dto, "2", "äº¤ä»˜äººæ‰‹æœºå·å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 1));
+            sucesslist.add(createProblemDataTre(dto, "2", "½»¸¶ÈËÊÖ»úºÅº¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 1));
         }
         if (!check.checkPhone(trPhone)) {
-            errorlist.add(createProblemDataTre(dto, "4", "è¿è¾“äººæ‰‹æœºå·å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 0));
+            errorlist.add(createProblemDataTre(dto, "4", "ÔËÊäÈËÊÖ»úºÅº¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 0));
         }else{
-            sucesslist.add(createProblemDataTre(dto, "4", "è¿è¾“äººæ‰‹æœºå·å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 0));
+            sucesslist.add(createProblemDataTre(dto, "4", "ÔËÊäÈËÊÖ»úºÅº¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 0));
         }
         if (!check.checkIdCard(trId)) {
-            errorlist.add(createProblemDataTre(dto, "3", "è¿è¾“äººè¯ä»¶å·é•¿åº¦æœ‰è¯¯/å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 0));
+            errorlist.add(createProblemDataTre(dto, "3", "ÔËÊäÈËÖ¤¼şºÅ³¤¶ÈÓĞÎó/º¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 0));
         }else{
-            sucesslist.add(createProblemDataTre(dto, "3", "è¿è¾“äººè¯ä»¶å·é•¿åº¦æœ‰è¯¯/å«ç‰¹æ®Šå­—ç¬¦ï¼Œä¸ç¬¦åˆæ•°æ®æ ‡å‡†",2, 1));
+            sucesslist.add(createProblemDataTre(dto, "3", "ÔËÊäÈËÖ¤¼şºÅ³¤¶ÈÓĞÎó/º¬ÌØÊâ×Ö·û£¬²»·ûºÏÊı¾İ±ê×¼",2, 1));
         }
-        //æ•°æ®ç¯èŠ‚å¯¹åº”æ ¡éªŒ
-        //ä»hbaseæ‹‰å–æ•°æ®
+        //Êı¾İ»·½Ú¶ÔÓ¦Ğ£Ñé
+        //´ÓhbaseÀ­È¡Êı¾İ
         byte[] rowKey = dto.getDeliveryCode().getBytes();
         Get get = new Get(rowKey);
         Result result = relationTable.get(get);
@@ -182,33 +182,33 @@ public class NucCheckUtil {
         if (StringUtils.isNotBlank(deliveryTime) && StringUtils.isNotBlank(tubeNum) && StringUtils.isNotBlank(packNum)) {
             LocalDateTime delivery = DateUtils.getDateTimeFromDate(deliveryTime);
             if (!tubeNum.equals(dto.getTubeNum().intValue())) {
-                errorlist.add(createProblemDataTre(dto, "5", "è¯•ç®¡æ•°é‡ä¸è½¬è¿æ•°æ®ä¸å¯¹åº”", 2, 0));
+                errorlist.add(createProblemDataTre(dto, "5", "ÊÔ¹ÜÊıÁ¿Óë×ªÔËÊı¾İ²»¶ÔÓ¦", 2, 0));
             }else{
-                sucesslist.add(createProblemDataTre(dto, "5", "è¯•ç®¡æ•°é‡ä¸è½¬è¿æ•°æ®ä¸å¯¹åº”", 2, 1));
+                sucesslist.add(createProblemDataTre(dto, "5", "ÊÔ¹ÜÊıÁ¿Óë×ªÔËÊı¾İ²»¶ÔÓ¦", 2, 1));
             }
             if (!packNum.equals(dto.getPackNum().intValue())) {
-                errorlist.add(createProblemDataTre(dto, "5", "æ‰“åŒ…æ•°é‡ä¸è½¬è¿æ•°æ®ä¸å¯¹åº”", 2, 0));
+                errorlist.add(createProblemDataTre(dto, "5", "´ò°üÊıÁ¿Óë×ªÔËÊı¾İ²»¶ÔÓ¦", 2, 0));
             }else{
-                sucesslist.add(createProblemDataTre(dto, "5", "æ‰“åŒ…æ•°é‡ä¸è½¬è¿æ•°æ®ä¸å¯¹åº”", 2, 1));
+                sucesslist.add(createProblemDataTre(dto, "5", "´ò°üÊıÁ¿Óë×ªÔËÊı¾İ²»¶ÔÓ¦", 2, 1));
             }
             if (delivery.plusHours(24).isBefore(LocalDateTime.now()) && delivery.plusHours(24).isBefore(receive)) {
-                errorlist.add(createProblemDataTre(dto, "6", "äº¤ä»˜æ—¶é—´å’Œæ¥æ”¶æ—¶é—´é—´éš”è¶…è¿‡24å°æ—¶", 2, 0));
+                errorlist.add(createProblemDataTre(dto, "6", "½»¸¶Ê±¼äºÍ½ÓÊÕÊ±¼ä¼ä¸ô³¬¹ı24Ğ¡Ê±", 2, 0));
             }else{
-                sucesslist.add(createProblemDataTre(dto, "6", "äº¤ä»˜æ—¶é—´å’Œæ¥æ”¶æ—¶é—´é—´éš”è¶…è¿‡24å°æ—¶", 2, 1));
+                sucesslist.add(createProblemDataTre(dto, "6", "½»¸¶Ê±¼äºÍ½ÓÊÕÊ±¼ä¼ä¸ô³¬¹ı24Ğ¡Ê±", 2, 1));
             }
-            sucesslist.add(createProblemDataTre(dto, "8", "æœªå‘ç°å¯¹åº”çš„è½¬è¿æ•°æ®", 1, 1));
+            sucesslist.add(createProblemDataTre(dto, "8", "Î´·¢ÏÖ¶ÔÓ¦µÄ×ªÔËÊı¾İ", 1, 1));
         }else {
             Duration du = Duration.between(receive, LocalDateTime.now());
             long hours = du.toHours();
             if (StringUtils.isBlank(deliveryTime) && hours >= 24) {
-                errorlist.add(createProblemDataTre(dto, "8", "æœªå‘ç°å¯¹åº”çš„è½¬è¿æ•°æ®", 1, 0));
+                errorlist.add(createProblemDataTre(dto, "8", "Î´·¢ÏÖ¶ÔÓ¦µÄ×ªÔËÊı¾İ", 1, 0));
             }
         }
         return new Tuple2<>(errorlist,sucesslist);
     }
 
     /**
-     * è½¬è¿ç¯èŠ‚äºŒæ¬¡æ ¡éªŒ
+     * ×ªÔË»·½Ú¶ş´ÎĞ£Ñé
      * @param dto
      * @param relationTable
      * @return
@@ -217,35 +217,35 @@ public class NucCheckUtil {
     public static Tuple2<List<ProblemDataTre>,List<ProblemDataTre>> transportCheck(TransportDataId dto, Table relationTable) throws IOException {
         List<ProblemDataTre> errorlist = new ArrayList<>();
         List<ProblemDataTre> sucesslist = new ArrayList<>();
-        //æ•°æ®å†…å®¹æ ¼å¼æ ¡éªŒ
+        //Êı¾İÄÚÈİ¸ñÊ½Ğ£Ñé
         if (dto.getDeliveryTime().compareTo(dto.getPackTime()) < 0) {
-            errorlist.add(createProblemDataTre(dto, "6", "æ­¤äº¤ä»˜å•çš„æ‰“åŒ…æ—¶é—´æ—©äºäº¤ä»˜æ—¶é—´ï¼Œä¸ç¬¦åˆæ ‡å‡†", 2, 0));
+            errorlist.add(createProblemDataTre(dto, "6", "´Ë½»¸¶µ¥µÄ´ò°üÊ±¼äÔçÓÚ½»¸¶Ê±¼ä£¬²»·ûºÏ±ê×¼", 2, 0));
         }else{
-            sucesslist.add(createProblemDataTre(dto, "6", "æ­¤äº¤ä»˜å•çš„æ‰“åŒ…æ—¶é—´æ—©äºäº¤ä»˜æ—¶é—´ï¼Œä¸ç¬¦åˆæ ‡å‡†", 2, 1));
+            sucesslist.add(createProblemDataTre(dto, "6", "´Ë½»¸¶µ¥µÄ´ò°üÊ±¼äÔçÓÚ½»¸¶Ê±¼ä£¬²»·ûºÏ±ê×¼", 2, 1));
         }
-        //æ•°æ®ç¯èŠ‚å¯¹åº”æ ¡éªŒ
+        //Êı¾İ»·½Ú¶ÔÓ¦Ğ£Ñé
         LocalDateTime delivery = DateUtils.getDateTimeFromDate(dto.getDeliveryTime());
         Duration du = Duration.between(delivery, LocalDateTime.now());
         long hours = du.toHours();
-        //ä»hbaseæ‹‰å–æ•°æ®
+        //´ÓhbaseÀ­È¡Êı¾İ
         byte[] rowKey = dto.getDeliveryCode().getBytes();
         Get get = new Get(rowKey);
         Result result = relationTable.get(get);
         String receiveTime = Bytes.toString(result.getValue(Constants.HBASE_FAMILY, "receiveTime".getBytes()));
         if (StringUtils.isBlank(receiveTime)) {
             if (hours >= 24) {
-                errorlist.add(createProblemDataTre(dto, "7", "æ­¤äº¤ä»˜å•è¶…è¿‡24å°æ—¶æœªå‘ç°æ¥æ”¶æ•°æ®", 1, 0));
+                errorlist.add(createProblemDataTre(dto, "7", "´Ë½»¸¶µ¥³¬¹ı24Ğ¡Ê±Î´·¢ÏÖ½ÓÊÕÊı¾İ", 1, 0));
             }
         }else{
             LocalDateTime receive = DateUtils.getDateTimeFromDate(receiveTime);
             if (receive.minusHours(24).isAfter(delivery)) {
-                errorlist.add(createProblemDataTre(dto, "7", "æ­¤äº¤ä»˜å•è¶…è¿‡24å°æ—¶æœªå‘ç°æ¥æ”¶æ•°æ®", 1, 0));
+                errorlist.add(createProblemDataTre(dto, "7", "´Ë½»¸¶µ¥³¬¹ı24Ğ¡Ê±Î´·¢ÏÖ½ÓÊÕÊı¾İ", 1, 0));
             }else{
-                sucesslist.add(createProblemDataTre(dto, "7", "æ­¤äº¤ä»˜å•è¶…è¿‡24å°æ—¶æœªå‘ç°æ¥æ”¶æ•°æ®", 1, 1));
+                sucesslist.add(createProblemDataTre(dto, "7", "´Ë½»¸¶µ¥³¬¹ı24Ğ¡Ê±Î´·¢ÏÖ½ÓÊÕÊı¾İ", 1, 1));
             }
             for (TransportItem transportItem : dto.getTransportItem()) {
                 String tubeCode = transportItem.getTubeCode();
-                //ä»hbaseæ‹‰å–æ•°æ®
+                //´ÓhbaseÀ­È¡Êı¾İ
                 byte[] tubeRowKey = tubeCode.getBytes();
                 Get tubeGet = new Get(tubeRowKey);
                 Result tubeResult = relationTable.get(tubeGet);
@@ -253,27 +253,27 @@ public class NucCheckUtil {
                 String collectSubmitId = Bytes.toString(tubeResult.getValue(Constants.HBASE_FAMILY, "submitId".getBytes()));
                 if (StringUtils.isNotBlank(tubeCollectTime) && StringUtils.isNotBlank(collectSubmitId)) {
                     if (dto.getPackTime().compareTo(tubeCollectTime) < 0) {
-                        errorlist.add(createProblemDataTre(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æµæ°´å·"+ collectSubmitId + "çš„é‡‡æ ·æ—¶é—´", 2, 0));
+                        errorlist.add(createProblemDataTre(dto, "6", "´ò°üÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÁ÷Ë®ºÅ"+ collectSubmitId + "µÄ²ÉÑùÊ±¼ä", 2, 0));
                     }else{
-                        sucesslist.add(createProblemDataTre(dto, "6", "æ‰“åŒ…æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æµæ°´å·"+ collectSubmitId + "çš„é‡‡æ ·æ—¶é—´", 2, 1));
+                        sucesslist.add(createProblemDataTre(dto, "6", "´ò°üÊ±¼ä²»Ó¦ÔçÓÚ²ÉÑùÁ÷Ë®ºÅ"+ collectSubmitId + "µÄ²ÉÑùÊ±¼ä", 2, 1));
                     }
                     if (dto.getDeliveryTime().compareTo(tubeCollectTime) < 0) {
-                        errorlist.add(createProblemDataTre(dto, "6", "äº¤ä»˜æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æµæ°´å·"+ collectSubmitId + "çš„é‡‡æ ·æ—¶é—´", 2, 0));
+                        errorlist.add(createProblemDataTre(dto, "6", "½»¸¶Ê±¼ä²»Ó¦ÔçÓÚ²ÉÑùÁ÷Ë®ºÅ"+ collectSubmitId + "µÄ²ÉÑùÊ±¼ä", 2, 0));
                     }else{
-                        sucesslist.add(createProblemDataTre(dto, "6", "äº¤ä»˜æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æµæ°´å·"+ collectSubmitId + "çš„é‡‡æ ·æ—¶é—´", 2, 1));
+                        sucesslist.add(createProblemDataTre(dto, "6", "½»¸¶Ê±¼ä²»Ó¦ÔçÓÚ²ÉÑùÁ÷Ë®ºÅ"+ collectSubmitId + "µÄ²ÉÑùÊ±¼ä", 2, 1));
                     }
                     LocalDateTime colt = DateUtils.getDateTimeFromDate(tubeCollectTime);
                     if (delivery.minusHours(24).isAfter(colt)) {
-                        errorlist.add(createProblemDataTre(dto, "6", "è½¬è¿å•ä¸å¯¹åº”çš„é‡‡æ ·æ•°æ®çš„å·®è·æ—¶é—´è¶…è¿‡24å°æ—¶", 2, 0));
+                        errorlist.add(createProblemDataTre(dto, "6", "×ªÔËµ¥Óë¶ÔÓ¦µÄ²ÉÑùÊı¾İµÄ²î¾àÊ±¼ä³¬¹ı24Ğ¡Ê±", 2, 0));
                     }else{
-                        sucesslist.add(createProblemDataTre(dto, "6", "è½¬è¿å•ä¸å¯¹åº”çš„é‡‡æ ·æ•°æ®çš„å·®è·æ—¶é—´è¶…è¿‡24å°æ—¶", 2, 1));
+                        sucesslist.add(createProblemDataTre(dto, "6", "×ªÔËµ¥Óë¶ÔÓ¦µÄ²ÉÑùÊı¾İµÄ²î¾àÊ±¼ä³¬¹ı24Ğ¡Ê±", 2, 1));
                     }
                     if (hours < 24) {
-                        sucesslist.add(createProblemDataTre(dto, "9", "æ­¤äº¤ä»˜å•æœªå‘ç°å¯¹åº”çš„é‡‡æ ·æ•°æ®", 1, 1));
+                        sucesslist.add(createProblemDataTre(dto, "9", "´Ë½»¸¶µ¥Î´·¢ÏÖ¶ÔÓ¦µÄ²ÉÑùÊı¾İ", 1, 1));
                     }
                 }else{
                     if (hours >= 24) {
-                        errorlist.add(createProblemDataTre(dto, "9", "æ­¤äº¤ä»˜å•æœªå‘ç°å¯¹åº”çš„é‡‡æ ·æ•°æ®", 1, 0));
+                        errorlist.add(createProblemDataTre(dto, "9", "´Ë½»¸¶µ¥Î´·¢ÏÖ¶ÔÓ¦µÄ²ÉÑùÊı¾İ", 1, 0));
                     }
                 }
             }
@@ -282,7 +282,7 @@ public class NucCheckUtil {
     }
 
     /**
-     * é‡‡é›†ç¯èŠ‚äºŒæ¬¡æ ¡éªŒ
+     * ²É¼¯»·½Ú¶ş´ÎĞ£Ñé
      * @param dto
      * @param relationTable
      * @return
@@ -292,42 +292,42 @@ public class NucCheckUtil {
         ParamCheck check = new ParamCheck();
         List<ProblemDataCr> errorlist = new ArrayList<>();
         List<ProblemDataCr> sucesslist = new ArrayList<>();
-        //æ•°æ®å†…å®¹æ ¼å¼æ ¡éªŒ
-        //æ£€æŸ¥æ ¼å¼å‰å…ˆè§£å¯†
+        //Êı¾İÄÚÈİ¸ñÊ½Ğ£Ñé
+        //¼ì²é¸ñÊ½Ç°ÏÈ½âÃÜ
         String name = AESUtil.decrypt(dto.getPersonName());
         String phone = AESUtil.decrypt(dto.getPersonPhone());
         String idCard = AESUtil.decrypt(dto.getPersonIdCard());
         if (StringUtils.isNotEmpty(idCard) && check.checkNotHaveString(idCard)) {
-            errorlist.add(setProblemCrFromData(dto, "1", "æ­¤æ•°æ®é‡Œè¯ä»¶å·æœ‰ä¸æ­£è§„å­—ç¬¦", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "1", "´ËÊı¾İÀïÖ¤¼şºÅÓĞ²»Õı¹æ×Ö·û", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "1", "æ­¤æ•°æ®é‡Œè¯ä»¶å·æœ‰ä¸æ­£è§„å­—ç¬¦", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "1", "´ËÊı¾İÀïÖ¤¼şºÅÓĞ²»Õı¹æ×Ö·û", 2, 1));
         }
         if (StringUtils.isNotEmpty(phone) && check.checkNotHaveString(phone)) {
-            errorlist.add(setProblemCrFromData(dto, "3", "æ­¤æ•°æ®é‡Œæ‰‹æœºå·æœ‰ä¸æ­£è§„å­—ç¬¦", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "3", "´ËÊı¾İÀïÊÖ»úºÅÓĞ²»Õı¹æ×Ö·û", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "3", "æ­¤æ•°æ®é‡Œæ‰‹æœºå·æœ‰ä¸æ­£è§„å­—ç¬¦", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "3", "´ËÊı¾İÀïÊÖ»úºÅÓĞ²»Õı¹æ×Ö·û", 2, 1));
         }
         if ((Objects.isNull(dto.getCollectCount()) && dto.getCollectCount() == 0)
                 || Objects.isNull(dto.getCollectLimitnum()) && dto.getCollectLimitnum() == 0) {
-            errorlist.add(setProblemCrFromData(dto, "7", "æ­¤æ•°æ®é‡Œè¯•ç®¡æ ·æœ¬æ•°ä¸ºç©ºæˆ–ä¸º0", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "7", "´ËÊı¾İÀïÊÔ¹ÜÑù±¾ÊıÎª¿Õ»òÎª0", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "7", "æ­¤æ•°æ®é‡Œè¯•ç®¡æ ·æœ¬æ•°ä¸ºç©ºæˆ–ä¸º0", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "7", "´ËÊı¾İÀïÊÔ¹ÜÑù±¾ÊıÎª¿Õ»òÎª0", 2, 1));
         }
         if (StringUtils.isNotEmpty(name) && check.checkNotHaveString(name)) {
-            errorlist.add(setProblemCrFromData(dto, "2", "æ­¤æ•°æ®é‡Œäººåæœ‰ä¸æ­£è§„å­—ç¬¦", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "2", "´ËÊı¾İÀïÈËÃûÓĞ²»Õı¹æ×Ö·û", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "2", "æ­¤æ•°æ®é‡Œäººåæœ‰ä¸æ­£è§„å­—ç¬¦", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "2", "´ËÊı¾İÀïÈËÃûÓĞ²»Õı¹æ×Ö·û", 2, 1));
         }
         if (dto.getAddTime().compareTo(dto.getCollectTime()) < 0) {
-            errorlist.add(setProblemCrFromData(dto, "6", "æ­¤æ•°æ®é‡Œä¸ŠæŠ¥æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 0));
+            errorlist.add(setProblemCrFromData(dto, "6", "´ËÊı¾İÀïÉÏ±¨Ê±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 0));
         }else{
-            sucesslist.add(setProblemCrFromData(dto, "6", "æ­¤æ•°æ®é‡Œä¸ŠæŠ¥æ—¶é—´ä¸åº”æ—©äºé‡‡æ ·æ—¶é—´", 2, 1));
+            sucesslist.add(setProblemCrFromData(dto, "6", "´ËÊı¾İÀïÉÏ±¨Ê±¼ä²»Ó¦ÔçÓÚ²ÉÑùÊ±¼ä", 2, 1));
         }
-        //æ•°æ®ç¯èŠ‚å¯¹åº”æ ¡éªŒ
+        //Êı¾İ»·½Ú¶ÔÓ¦Ğ£Ñé
         LocalDateTime collect = DateUtils.getDateTimeFromDate(dto.getCollectTime());
         Duration du = Duration.between(collect, LocalDateTime.now());
         long hours = du.toHours();
-        //ä»hbaseæ‹‰å–æ•°æ®
+        //´ÓhbaseÀ­È¡Êı¾İ
         StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
         sj.add(dto.getPersonIdCard());
         sj.add(dto.getTubeCode());
@@ -337,13 +337,13 @@ public class NucCheckUtil {
         String reportTime = Bytes.toString(result.getValue(Constants.HBASE_FAMILY, "checkTime".getBytes()));
         if (hours >= 24) {
             if (StringUtils.isBlank(reportTime)) {
-                errorlist.add(setProblemCrFromData(dto, "4", "è¯¥é‡‡æ ·æ•°æ®è¶…24å°æ—¶æ— å¯¹åº”çš„æ£€æµ‹ç»“æœæ•°æ®", 1, 0));
+                errorlist.add(setProblemCrFromData(dto, "4", "¸Ã²ÉÑùÊı¾İ³¬24Ğ¡Ê±ÎŞ¶ÔÓ¦µÄ¼ì²â½á¹ûÊı¾İ", 1, 0));
             } else {
                 LocalDateTime checkTime = DateUtils.getDateTimeFromDate(reportTime);
                 if (checkTime.minusHours(24).isAfter(collect)) {
-                    errorlist.add(setProblemCrFromData(dto, "4", "è¯¥é‡‡æ ·æ•°æ®è¶…24å°æ—¶æ— å¯¹åº”çš„æ£€æµ‹ç»“æœæ•°æ®",1, 0));
+                    errorlist.add(setProblemCrFromData(dto, "4", "¸Ã²ÉÑùÊı¾İ³¬24Ğ¡Ê±ÎŞ¶ÔÓ¦µÄ¼ì²â½á¹ûÊı¾İ",1, 0));
                 }else{
-                    sucesslist.add(setProblemCrFromData(dto, "4", "è¯¥é‡‡æ ·æ•°æ®è¶…24å°æ—¶æ— å¯¹åº”çš„æ£€æµ‹ç»“æœæ•°æ®",1, 1));
+                    sucesslist.add(setProblemCrFromData(dto, "4", "¸Ã²ÉÑùÊı¾İ³¬24Ğ¡Ê±ÎŞ¶ÔÓ¦µÄ¼ì²â½á¹ûÊı¾İ",1, 1));
                 }
             }
         }
@@ -351,7 +351,7 @@ public class NucCheckUtil {
     }
 
     /**
-     * è®¾ç½®é‡‡é›†å·¥å•
+     * ÉèÖÃ²É¼¯¹¤µ¥
      * @param dto
      * @param problemType
      * @param record
@@ -365,10 +365,10 @@ public class NucCheckUtil {
         data.setArea_id(dto.getAreaId());
         data.setPerson_id_card(dto.getPersonIdCard());
         data.setSubmit_id(dto.getSubmitId());
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(dto.getNumberReport());
         data.setCollect_time(dto.getCollectTime());
         data.setSource(1);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         data.setAdd_time(dto.getAddTime());
@@ -376,11 +376,13 @@ public class NucCheckUtil {
         data.setIs_valid(isValid);
         data.setIs_delete(0);
         data.setCreate_by(dto.getUserName());
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
     /**
-     * è®¾ç½®æ£€æµ‹å·¥å•
+     * ÉèÖÃ¼ì²â¹¤µ¥
      * @param dto
      * @param problemType
      * @param record
@@ -395,10 +397,10 @@ public class NucCheckUtil {
         data.setPerson_id_card(dto.getPersonIdCard());
         data.setSubmit_id(dto.getSubmitId());
         data.setCollect_time(dto.getCollectTime());
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(dto.getNumberReport());
         data.setCheck_time(dto.getCheckTime());
         data.setSource(4);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         data.setAdd_time(dto.getAddTime());
@@ -406,11 +408,13 @@ public class NucCheckUtil {
         data.setIs_valid(isValid);
         data.setIs_delete(0);
         data.setCreate_by(dto.getUserName());
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
     /**
-     * è®¾ç½®è½¬è¿å·¥å•
+     * ÉèÖÃ×ªÔË¹¤µ¥
      * @param dto
      * @param problemType
      * @param record
@@ -430,16 +434,18 @@ public class NucCheckUtil {
         data.setCode(dto.getDeliveryCode());
         data.setTime(dto.getDeliveryTime());
         data.setIs_valid(isValid);
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(Long.valueOf(dto.getNumberReport()));
         data.setProblem_record(record);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setIs_delete(0);
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
     /**
-     * è®¾ç½®æ¥æ”¶å·¥å•
+     * ÉèÖÃ½ÓÊÕ¹¤µ¥
      * @param dto
      * @param problemType
      * @param record
@@ -459,11 +465,13 @@ public class NucCheckUtil {
         data.setCode(dto.getReceiveCode());
         data.setTime(dto.getReceiveTime());
         data.setIs_valid(isValid);
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(Long.valueOf(dto.getNumberReport()));
         data.setProblem_record(record);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setIs_delete(0);
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 }

@@ -95,7 +95,7 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 commonDataProcess(jsonArray, Constants.CHECK_ORG,Arrays.asList("creditCode", "areaId", "orgName"));
                 break;
             case Constants.HOUR_SUM_REPORT:
-                commonDataProcess(jsonArray, Constants.HOUR_SUM_REPORT,Arrays.asList("areaId", "collectDate", "unitHour"));
+                //commonDataProcess(jsonArray, Constants.HOUR_SUM_REPORT,Arrays.asList("areaId", "collectDate", "unitHour"));
                 break;
             default:
                 break;

@@ -94,14 +94,20 @@ public class DataCheckDriver extends BaseJob {
         DataStream<String> crStrStream= crDataStream.map(new MapFunction<ProblemDataCr, String>() {
             @Override
             public String map(ProblemDataCr problemDataCr) throws Exception {
-                return JSONObject.toJSONString(problemDataCr);
+                JSONObject jsonObject = (JSONObject)JSONObject.toJSON(problemDataCr);
+                jsonObject.put("TYPE",problemDataCr.getTYPE());
+                jsonObject.remove("tYPE");
+                return jsonObject.toJSONString();
             }
         });
 
         DataStream<String> treStrStream= treDataStream.map(new MapFunction<ProblemDataTre, String>() {
             @Override
             public String map(ProblemDataTre problemDataTre) throws Exception {
-                return JSONObject.toJSONString(problemDataTre);
+                JSONObject jsonObject = (JSONObject)JSONObject.toJSON(problemDataTre);
+                jsonObject.put("TYPE",problemDataTre.getTYPE());
+                jsonObject.remove("tYPE");
+                return jsonObject.toJSONString();
             }
         });
 

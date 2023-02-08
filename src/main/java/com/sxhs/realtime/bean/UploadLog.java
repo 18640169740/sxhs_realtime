@@ -14,9 +14,9 @@ public class UploadLog {
     private Integer source;
     private Long id;
     private String number_report;
-    private int upload_number;
-    private int success_number;
-    private int fail_number;
+    private int upload_number = 0;
+    private int success_number = 0;
+    private int fail_number = 0;
     private String data_file;
     private String section_time;
     private int upload_result;

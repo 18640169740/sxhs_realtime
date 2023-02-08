@@ -39,7 +39,7 @@ public class ReportDataId {
     private Integer collectLimitnum;
     private Integer collectCount;
 
-    private Integer numberReport;
+    private Long numberReport;
     private String interfaceRecTime;
     private String userName;
     private Long clientId;

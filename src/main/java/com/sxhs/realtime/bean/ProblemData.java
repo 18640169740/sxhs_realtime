@@ -14,8 +14,8 @@ public class ProblemData {
     protected Integer source;
     protected Long id;
     private Long submit_id;
-    protected String number_report;
-    protected Integer type;
+    protected Long number_report;
+    protected Integer TYPE;
     protected String problem_type;
     protected String problem_record;
     protected Integer is_delete;
