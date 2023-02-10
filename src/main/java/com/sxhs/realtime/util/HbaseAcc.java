@@ -5,7 +5,9 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Data
 public class HbaseAcc {
@@ -21,11 +23,13 @@ public class HbaseAcc {
     public Integer getValue() {
         int result = 0;
         if (list.size() > 0) {
+            Set<String> set = new HashSet<>(list);
             List<Get> batchList = new ArrayList<>();
-            for (String str : list) {
+            for (String str : set) {
                 batchList.add(new Get(str.getBytes()));
                 if (batchList.size() >= batch) {
                     result += _doSearch(batchList);
+                    batchList = new ArrayList<>();
                 }
             }
             if (batchList.size() > 0) {
