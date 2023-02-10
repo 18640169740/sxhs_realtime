@@ -16,6 +16,7 @@
         <scala.version>2.12</scala.version>
         <hadoop.version>3.1.3</hadoop.version>
         <hbase.version>2.3.5</hbase.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
@@ -53,6 +54,7 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-jdbc_${scala.version}</artifactId>
             <version>${flink.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -150,6 +152,7 @@
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.28</version>
+            <scope>provided</scope>
         </dependency>
 
         <!--        同样的方法调用，有的统计会报错-->
