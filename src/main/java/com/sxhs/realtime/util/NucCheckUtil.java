@@ -365,10 +365,10 @@ public class NucCheckUtil {
         data.setArea_id(dto.getAreaId());
         data.setPerson_id_card(dto.getPersonIdCard());
         data.setSubmit_id(dto.getSubmitId());
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(dto.getNumberReport());
         data.setCollect_time(dto.getCollectTime());
         data.setSource(1);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         data.setAdd_time(dto.getAddTime());
@@ -376,6 +376,8 @@ public class NucCheckUtil {
         data.setIs_valid(isValid);
         data.setIs_delete(0);
         data.setCreate_by(dto.getUserName());
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
@@ -395,10 +397,10 @@ public class NucCheckUtil {
         data.setPerson_id_card(dto.getPersonIdCard());
         data.setSubmit_id(dto.getSubmitId());
         data.setCollect_time(dto.getCollectTime());
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(dto.getNumberReport());
         data.setCheck_time(dto.getCheckTime());
         data.setSource(4);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         data.setAdd_time(dto.getAddTime());
@@ -406,6 +408,8 @@ public class NucCheckUtil {
         data.setIs_valid(isValid);
         data.setIs_delete(0);
         data.setCreate_by(dto.getUserName());
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
@@ -430,11 +434,13 @@ public class NucCheckUtil {
         data.setCode(dto.getDeliveryCode());
         data.setTime(dto.getDeliveryTime());
         data.setIs_valid(isValid);
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(Long.valueOf(dto.getNumberReport()));
         data.setProblem_record(record);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setIs_delete(0);
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 
@@ -459,11 +465,13 @@ public class NucCheckUtil {
         data.setCode(dto.getReceiveCode());
         data.setTime(dto.getReceiveTime());
         data.setIs_valid(isValid);
-        data.setNumber_report(String.valueOf(dto.getNumberReport()));
+        data.setNumber_report(Long.valueOf(dto.getNumberReport()));
         data.setProblem_record(record);
-        data.setType(type);
+        data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setIs_delete(0);
+        data.setUpdate_by(dto.getUserName());
+        data.setUpdate_time(Constants.FASTDATEFORMAT.format(new Date()));
         return data;
     }
 }

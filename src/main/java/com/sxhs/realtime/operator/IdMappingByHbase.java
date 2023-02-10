@@ -85,17 +85,21 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 commonDataProcess(jsonArray, Constants.REPORT_DATA, Arrays.asList("personIdCard","collectTime","checkTime"));
                 //将检测结果数据中person_id_card+tube_code存入到hbase缓存中
                 reportRelProcess(jsonArray);
+                //核酸检测结果数据处理
+                resultDataProcess(jsonArray);
                 break;
             case Constants.XA_REPORT_DATA:
                 commonDataProcess(jsonArray, Constants.XA_REPORT_DATA,Arrays.asList("personIdCard", "collectTime", "checkTime"));
                 //将检测结果数据中person_id_card+tube_code存入到hbase缓存中
                 reportRelProcess(jsonArray);
+                //核酸检测结果数据处理
+                resultDataProcess(jsonArray);
                 break;
             case Constants.CHECK_ORG:
                 commonDataProcess(jsonArray, Constants.CHECK_ORG,Arrays.asList("creditCode", "areaId", "orgName"));
                 break;
             case Constants.HOUR_SUM_REPORT:
-                commonDataProcess(jsonArray, Constants.HOUR_SUM_REPORT,Arrays.asList("areaId", "collectDate", "unitHour"));
+                //commonDataProcess(jsonArray, Constants.HOUR_SUM_REPORT,Arrays.asList("areaId", "collectDate", "unitHour"));
                 break;
             default:
                 break;
@@ -210,6 +214,36 @@ public class IdMappingByHbase extends KeyedProcessFunction<String, CommonDuplica
                 putIdToHbase(dataKey, type, dataId);
             }
             jsonObject.put(Constants.ID, Long.valueOf(dataId));
+        }
+    }
+
+    /**
+     * 核酸检测结果数据处理
+     * @param jsonArray
+     * @throws IOException
+     */
+    private void resultDataProcess(JSONArray jsonArray) throws IOException {
+        for (Object obj : jsonArray) {
+            JSONObject jsonObject = (JSONObject) obj;
+            resultDataProcess(jsonObject,"checkResult",jsonObject.getString("checkResult"));
+            resultDataProcess(jsonObject,"iggResult",jsonObject.getString("iggResult"));
+            resultDataProcess(jsonObject,"igmResult",jsonObject.getString("igmResult"));
+        }
+    }
+
+    private void resultDataProcess(JSONObject jsonObject, String key, String checkResult){
+        if(StringUtils.isBlank(checkResult)){
+            return;
+        }
+        switch (checkResult){
+            case "1":
+                jsonObject.put(key,"阴性");
+                break;
+            case "2":
+                jsonObject.put(key,"阳性");
+                break;
+            default:
+                break;
         }
     }
 

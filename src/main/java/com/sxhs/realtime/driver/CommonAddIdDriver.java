@@ -71,6 +71,8 @@ public class CommonAddIdDriver extends BaseJob {
         //将bean对象转成json字符串
         DataStream<String> dataStrStream = dataStream.map(new CommonDuplicateDataToJson()).name("toJson");
 
+        properties.setProperty("max.request.size", "10485760");
+
         FlinkKafkaProducer<String> producer = new FlinkKafkaProducer<String>(
                 parameterMap.get("sink.topic.name"),
                 new SimpleStringSchema(),

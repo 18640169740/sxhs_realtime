@@ -19,7 +19,7 @@ public class JobUtils {
     public static SinkFunction<String> getStarrocksSink(String tableName){
         SinkFunction<String> sink = StarRocksSink.sink(
                 StarRocksSinkOptions.builder()
-                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030?nuc_db")
+                        .withProperty("jdbc-url", "jdbc:mysql://10.17.41.138:9030/nuc_db?characterEncoding=utf8")
                         .withProperty("load-url", "10.17.41.138:8030")
                         .withProperty("database-name", "nuc_db")
                         .withProperty("username", "zhangjunwei")

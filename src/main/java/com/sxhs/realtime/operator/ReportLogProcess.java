@@ -64,7 +64,7 @@ public class ReportLogProcess extends ProcessFunction<String,String> {
         JSONObject jsonObject = JSONObject.parseObject(str);
         String type = jsonObject.getString("type");
         if(!Constants.COLLECT_DATA.equals(type) && !Constants.TRANSPORT_DATA.equals(type)
-                && !Constants.RECEIVE_DATA.equals(type) && !Constants.REPORT_DATA.equals(type) && !Constants.REPORT_DATA.equals(type)){
+                && !Constants.RECEIVE_DATA.equals(type) && !Constants.REPORT_DATA.equals(type) && !Constants.XA_REPORT_DATA.equals(type)){
             return;
         }
         JSONArray data = jsonObject.getJSONArray("data");
@@ -150,8 +150,8 @@ public class ReportLogProcess extends ProcessFunction<String,String> {
                     areaId = reportDataId.getAreaId();
                     uploadTime = reportDataId.getAddTime();
                     sectionTime = reportDataId.getCheckTime();
-                    recordId = reportDataId.getRecordId().toString();
-                    submitId = reportDataId.getSubmitId().toString();
+                    recordId = reportDataId.getRecordId() == null ? "" : reportDataId.getRecordId().toString();
+                    submitId = reportDataId.getSubmitId() == null ? "" : reportDataId.getSubmitId().toString();
                     break;
                 default:
                     break;
@@ -173,7 +173,6 @@ public class ReportLogProcess extends ProcessFunction<String,String> {
         uploadLog.setCreate_by(createBy);
         uploadLog.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         uploadLog.setIs_delete(0);
-
         if(uploadLog.getArea_id() == null || StringUtils.isBlank(uploadLog.getNumber_report())
         || uploadLog.getSource() == null || uploadLog.getUpload_number() == 0 || StringUtils.isBlank(uploadLog.getUpload_time())){
             context.output(Constants.UPLOAD_LOG_FAIL_TAG,JSONObject.toJSONString(uploadLog));
