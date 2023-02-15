@@ -20,6 +20,8 @@ public class Constants {
     public static byte[] HBASE_FAMILY = "cf".getBytes();
     //列
     public static byte[] HBASE_COLUMN = "col".getBytes();
+    //
+    public static byte[] HBASE_COLUMN_TIME = "add_time".getBytes();
 
     /**
      * 核酸数据类型

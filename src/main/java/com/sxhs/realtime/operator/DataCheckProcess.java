@@ -107,19 +107,17 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
         List<ProblemDataCr> sucessList = result.f1;
         List<Put> putList = new ArrayList<>();
         if(errorList != null && errorList.size() > 0){
-            errorList.forEach(cr -> {
-                Long id = cr.getId();
+            for (ProblemDataCr cr : errorList) {
                 Integer source = cr.getSource();
                 String person_id_card = cr.getPerson_id_card();
                 String checkTime = cr.getCheck_time();
                 String problem_record = cr.getProblem_record();
                 StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
                 sj.add(source.toString()).add(person_id_card).add(checkTime).add(problem_record);
-                Put put = new Put(MD5Hash.getMD5AsHex((sj.toString()).getBytes()).getBytes());
-                put.addColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN, id.toString().getBytes());
-                putList.add(put);
+
+                relationHbase(putList, cr, sj);
                 context.output(crTag, cr);
-            });
+            };
         }
         if(sucessList != null && sucessList.size() > 0){
             List<Get> getList = new ArrayList<>();
@@ -137,12 +135,15 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
             for (int i = 0; i < results.length; i++) {
                 Result r = results[i];
                 String id = "";
+                String addTime = "";
                 if (r != null && r.containsColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN)) {
                     id = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN));
+                    addTime = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME));
                 }
                 if(StringUtils.isNotBlank(id)){
                     ProblemDataCr problemDataCr = sucessList.get(i);
                     problemDataCr.setId(Long.parseLong(id));
+                    problemDataCr.setAdd_time(addTime);
                     Integer source = problemDataCr.getSource();
                     String person_id_card = problemDataCr.getPerson_id_card();
                     String checkTime = problemDataCr.getCheck_time();
@@ -168,24 +169,22 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
      * @param result
      * @throws IOException
      */
-    public void collectCheckByHbase(Context context, OutputTag<ProblemDataCr> crTag, Tuple2<List<ProblemDataCr>, List<ProblemDataCr>> result) throws IOException {
+    public void collectCheckByHbase(Context context, OutputTag<ProblemDataCr> crTag, Tuple2<List<ProblemDataCr>, List<ProblemDataCr>> result) throws Exception {
         List<ProblemDataCr> errorList = result.f0;
         List<ProblemDataCr> sucessList = result.f1;
         List<Put> putList = new ArrayList<>();
         if(errorList != null && errorList.size() > 0){
-            errorList.forEach(cr -> {
-                Long id = cr.getId();
+            for (ProblemDataCr cr : errorList) {
                 Integer source = cr.getSource();
                 String person_id_card = cr.getPerson_id_card();
                 String collect_time = cr.getCollect_time();
                 String problem_record = cr.getProblem_record();
                 StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
                 sj.add(source.toString()).add(person_id_card).add(collect_time).add(problem_record);
-                Put put = new Put(MD5Hash.getMD5AsHex((sj.toString()).getBytes()).getBytes());
-                put.addColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN, id.toString().getBytes());
-                putList.add(put);
+
+                relationHbase(putList, cr, sj);
                 context.output(crTag, cr);
-            });
+            };
         }
         if(sucessList != null && sucessList.size() > 0){
             List<Get> getList = new ArrayList<>();
@@ -203,12 +202,15 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
             for (int i = 0; i < results.length; i++) {
                 Result r = results[i];
                 String id = "";
+                String addTime = "";
                 if (r != null && r.containsColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN)) {
                     id = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN));
+                    addTime = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME));
                 }
                 if(StringUtils.isNotBlank(id)){
                     ProblemDataCr problemDataCr = sucessList.get(i);
                     problemDataCr.setId(Long.parseLong(id));
+                    problemDataCr.setAdd_time(addTime);
                     Integer source = problemDataCr.getSource();
                     String person_id_card = problemDataCr.getPerson_id_card();
                     String collect_time = problemDataCr.getCollect_time();
@@ -239,19 +241,17 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
         List<ProblemDataTre> sucessList = result.f1;
         List<Put> putList = new ArrayList<>();
         if (errorList != null && errorList.size() > 0) {
-            errorList.forEach(cr -> {
-                Long id = cr.getId();
+            for (ProblemDataTre cr : errorList) {
                 Integer source = cr.getSource();
                 Long submitId = cr.getSubmit_id();
                 String code = cr.getCode();
                 String problem_record = cr.getProblem_record();
                 StringJoiner sj = new StringJoiner(Constants.HBASE_KEY_SPLIT);
                 sj.add(source.toString()).add(submitId.toString()).add(code).add(problem_record);
-                Put put = new Put(MD5Hash.getMD5AsHex((sj.toString()).getBytes()).getBytes());
-                put.addColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN, id.toString().getBytes());
-                putList.add(put);
+
+                relationHbase(putList, cr, sj);
                 context.output(treTag, cr);
-            });
+            };
         }
         if (sucessList != null && sucessList.size() > 0) {
             List<Get> getList = new ArrayList<>();
@@ -269,12 +269,15 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
             for (int i = 0; i < results.length; i++) {
                 Result r = results[i];
                 String id = "";
+                String addTime = "";
                 if (r != null && r.containsColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN)) {
                     id = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN));
+                    addTime = Bytes.toString(r.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME));
                 }
                 if (StringUtils.isNotBlank(id)) {
                     ProblemDataTre problemDataTre = sucessList.get(i);
                     problemDataTre.setId(Long.parseLong(id));
+                    problemDataTre.setAdd_time(addTime);
                     Integer source = problemDataTre.getSource();
                     Long submitId = problemDataTre.getSubmit_id();
                     String code = problemDataTre.getCode();
@@ -290,6 +293,34 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
         }
         if (putList.size() > 0) {
             checkTable.put(putList);
+        }
+    }
+
+    /**
+     * 工单数据关联hbase
+     * @param putList
+     * @param cr
+     * @param sj
+     * @throws IOException
+     */
+    public void relationHbase(List<Put> putList, ProblemData cr, StringJoiner sj) throws IOException {
+        Get get = new Get(MD5Hash.getMD5AsHex((sj.toString()).getBytes()).getBytes());
+        Result hbaseResult = checkTable.get(get);
+        Long id = cr.getId();
+        String addTime = cr.getAdd_time();
+        if (hbaseResult != null && hbaseResult.containsColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN)) {
+            String idStr = Bytes.toString(hbaseResult.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN));
+            addTime = Bytes.toString(hbaseResult.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME));
+            if(StringUtils.isNotBlank(idStr)){
+                id = Long.parseLong(idStr);
+                cr.setId(id);
+                cr.setAdd_time(addTime);
+            }
+        }else {
+            Put put = new Put(MD5Hash.getMD5AsHex((sj.toString()).getBytes()).getBytes());
+            put.addColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN, id.toString().getBytes());
+            put.addColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME, addTime.getBytes());
+            putList.add(put);
         }
     }
 

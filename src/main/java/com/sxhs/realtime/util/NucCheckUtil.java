@@ -371,7 +371,7 @@ public class NucCheckUtil {
         data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
-        data.setAdd_time(dto.getAddTime());
+        data.setAdd_time(dto.getAddTime() == null ? Constants.FASTDATEFORMAT.format(new Date()): dto.getAddTime());
         data.setProblem_record(record);
         data.setIs_valid(isValid);
         data.setIs_delete(0);
@@ -403,7 +403,7 @@ public class NucCheckUtil {
         data.setTYPE(type);
         data.setProblem_type(problemType);
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
-        data.setAdd_time(dto.getAddTime());
+        data.setAdd_time(dto.getAddTime() == null ? Constants.FASTDATEFORMAT.format(new Date()): dto.getAddTime());
         data.setProblem_record(record);
         data.setIs_valid(isValid);
         data.setIs_delete(0);
@@ -428,7 +428,7 @@ public class NucCheckUtil {
         data.setSubmit_id(dto.getSubmitId());
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         data.setArea_id(dto.getAreaId());
-        data.setAdd_time(dto.getAddTime());
+        data.setAdd_time(dto.getAddTime() == null ? Constants.FASTDATEFORMAT.format(new Date()): dto.getAddTime());
         data.setCreate_by(dto.getUserName());
         data.setName(dto.getDeliveryName());
         data.setCode(dto.getDeliveryCode());
@@ -459,7 +459,7 @@ public class NucCheckUtil {
         data.setArea_id(dto.getAreaId());
         data.setSubmit_id(dto.getSubmitId());
         data.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
-        data.setAdd_time(dto.getAddTime());
+        data.setAdd_time(dto.getAddTime() == null ? Constants.FASTDATEFORMAT.format(new Date()): dto.getAddTime());
         data.setCreate_by(dto.getUserName());
         data.setName(dto.getReceiveName());
         data.setCode(dto.getReceiveCode());

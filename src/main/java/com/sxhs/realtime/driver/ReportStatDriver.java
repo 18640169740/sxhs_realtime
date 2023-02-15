@@ -81,7 +81,7 @@ public class ReportStatDriver extends BaseJob {
                 jsonObj.put("collect_date", hourSumReportId.getCollectDate());
                 jsonObj.put("unit_hour", hourSumReportId.getUnitHour());
                 jsonObj.put("collect_persons", hourSumReportId.getCollectPersons());
-                jsonObj.put("collect_sample_num", hourSumReportId.getCheckSampleNum());
+                jsonObj.put("collect_sample_num", hourSumReportId.getCollectSampleNum());
                 jsonObj.put("transfer_persons", hourSumReportId.getTransferPersons());
                 jsonObj.put("transfer_sample_num", hourSumReportId.getTransferSampleNum());
                 jsonObj.put("receive_persons", hourSumReportId.getReceivePersons());
