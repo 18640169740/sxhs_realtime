@@ -311,7 +311,7 @@ public class DataCheckProcess<T> extends ProcessFunction<T, Object> {
         if (hbaseResult != null && hbaseResult.containsColumn(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN)) {
             String idStr = Bytes.toString(hbaseResult.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN));
             addTime = Bytes.toString(hbaseResult.getValue(Constants.HBASE_FAMILY, Constants.HBASE_COLUMN_TIME));
-            if(StringUtils.isNotBlank(idStr)){
+            if(StringUtils.isNotBlank(idStr) && StringUtils.isNotBlank(addTime)){
                 id = Long.parseLong(idStr);
                 cr.setId(id);
                 cr.setAdd_time(addTime);

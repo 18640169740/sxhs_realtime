@@ -173,14 +173,13 @@ public class ReportLogProcess extends ProcessFunction<String,String> {
         uploadLog.setCreate_by(createBy);
         uploadLog.setCreate_time(Constants.FASTDATEFORMAT.format(new Date()));
         uploadLog.setIs_delete(0);
-        if(uploadLog.getArea_id() == null || StringUtils.isBlank(uploadLog.getNumber_report())
-        || uploadLog.getSource() == null || uploadLog.getUpload_number() == 0 || StringUtils.isBlank(uploadLog.getUpload_time())){
+        if(uploadLog.getArea_id() == null || uploadLog.getSource() == null || StringUtils.isBlank(uploadLog.getUpload_time())){
             context.output(Constants.UPLOAD_LOG_FAIL_TAG,JSONObject.toJSONString(uploadLog));
         }else{
             context.output(Constants.UPLOAD_LOG_TAG,JSONObject.toJSONString(uploadLog));
         }
 
-        if(areaId == null || source == null || StringUtils.isBlank(recordId) || StringUtils.isBlank(numberReport)){
+        if(areaId == null || source == null){
             //采转送检对账表错误数据表
             UploadReportFail uploadReportFail = new UploadReportFail();
             uploadReportFail.setId(Long.parseLong(SnowflakeIdWorker.generateIdReverse()));
