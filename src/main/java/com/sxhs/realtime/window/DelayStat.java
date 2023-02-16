@@ -84,7 +84,6 @@ public class DelayStat extends BaseJob {
                 .unionAll(receiveState)
                 .unionAll(reportState);
         DataStream<Row> unionStream = tEnv.toAppendStream(unionTable, Row.class);
-        // TODO 在统计中直接生成
         SingleOutputStreamOperator<String> resultStream = unionStream.map((MapFunction<Row, String>) row -> {
             JSONObject jsonObj = new JSONObject();
             jsonObj.put("id", SnowflakeIdWorker.generateId());

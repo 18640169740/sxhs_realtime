@@ -148,7 +148,7 @@ public class CityDistrictDataStat extends BaseJob {
                         result.put("problem_error", problemError + cache.getIntValue("problem_error"));
                         result.put("problem_unsync", problemUnsync + cache.getIntValue("problem_unsync"));
 
-                        result.put("problem_number_report", (long) row.getField(10) + cache.getLongValue("problem_number_report"));
+                        result.put("problem_number_report", row.getField(10));
                         result.put("problem_error", (int) row.getField(11) + cache.getIntValue("problem_error"));
                         result.put("problem_unsync", (int) row.getField(12) + cache.getIntValue("problem_unsync"));
 
