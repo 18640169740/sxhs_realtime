@@ -229,7 +229,8 @@ public class ProblemDataStat extends KeyedProcessFunction<Tuple3<String,String,S
                 }
                 break;
             case Constants.FAIL_NUMBER:
-                if(problemData.getIs_valid() == 0){
+                if(problemData.getIs_valid() == 0 && problemData.getSource() == 1
+                        && "4".equals(problemData.getProblem_type())){
                     num = 1;
                 }
                 break;
