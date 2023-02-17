@@ -168,7 +168,9 @@ public class ReportPersonTodayStat extends BaseJob {
                 "concat_ws('_',cast(areaId as string),'1',SUBSTRING(max(interfaceRecTime) from 1 FOR 10)) union_id, " +
                 "areaId area_id, " +
                 "1 source, " +
-                "upload_number(concat_ws('_',personIdCard,tubeCode)) upload_number, " +
+//                "upload_number(concat_ws('_',personIdCard,tubeCode)) upload_number, " +
+                // TODO 如何取值
+                "count(distinct personIdCard) upload_number, " +
                 "count(1) success_number, " +
                 "count(distinct personIdCard) fail_number, " +
                 "max(interfaceRecTime) upload_time, " +
@@ -216,7 +218,8 @@ public class ReportPersonTodayStat extends BaseJob {
                 "concat_ws('_',cast(areaId as string),'4',SUBSTRING(max(interfaceRecTime) from 1 FOR 10)) union_id, " +
                 "areaId area_id, " +
                 "4 source, " +
-                "upload_number(concat_ws('_',personIdCard,tubeCode)) upload_number, " +
+//                "upload_number(concat_ws('_',personIdCard,tubeCode)) upload_number, " +
+                "0 upload_number, " +
                 "count(1) success_number, " +
                 "count(distinct personIdCard) fail_number, " +
                 "max(interfaceRecTime) upload_time, " +

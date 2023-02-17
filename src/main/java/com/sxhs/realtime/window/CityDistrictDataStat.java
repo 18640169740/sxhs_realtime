@@ -201,7 +201,8 @@ public class CityDistrictDataStat extends BaseJob {
      */
     private static Table _statReport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+//                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'4',cast(0 as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -212,7 +213,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "0 fail_number, " + // 环节对应数量:为空
                 "count(distinct tubeCode) tube_number, " +
                 "report_check(personIdCard, personName, personPhone, packTime, collectTime, receiveTime, checkTime, addTime, collectCount, collectLimitnum, tubeCode) problem_number, " +
-                "numberReport problem_number_report, " +
+//                "numberReport problem_number_report, " +
+                "0 problem_number_report, " +
                 "0 problem_error, " +
                 "0 problem_unsync, " +
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
@@ -223,7 +225,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "areaId, " +
                 "collectLocationCity , " +
                 "collectLocationDistrict, " +
-                "numberReport";
+//                "numberReport";
+                "0";
         return tEnv.sqlQuery(sql);
     }
 
@@ -235,7 +238,8 @@ public class CityDistrictDataStat extends BaseJob {
      */
     private static Table _statReceive(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+//                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','3',cast(0 as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -245,7 +249,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "0 fail_number, " + // 环节对应数量:为空
                 "cast(sum(tubeNum) as bigint) tube_number, " +
                 "'0,0,0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
-                "numberReport problem_number_report, " +
+//                "numberReport problem_number_report, " +
+                "0 problem_number_report, " +
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
@@ -254,7 +259,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "group by " +
                 "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
-                "numberReport";
+//                "numberReport";
+                "0";
         return tEnv.sqlQuery(sql);
     }
 
@@ -267,7 +273,8 @@ public class CityDistrictDataStat extends BaseJob {
      */
     private static Table _statTransport(StreamTableEnvironment tEnv) {
         String sql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+//                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),'','','2',cast(0 as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "cast('' as string) collect_location_city, " + // 采样点市
                 "cast('' as string) collect_location_district, " + // 采样点区县
@@ -277,7 +284,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "0 fail_number, " + // 环节对应数量:为空
                 "cast(sum(tubeNum) as bigint) tube_number, " +
                 "'0,0,0' problem_number, " + // TODO 有工单数据量(二次校验不通过数量)
-                "numberReport problem_number_report, " +
+//                "numberReport problem_number_report, " +
+                "0 problem_number_report, " +
                 "0 problem_error, " + // TODO 数据异常问题量(二次校验问题分组统计)
                 "0 problem_unsync, " + // TODO 环节不对应问题量(二次校验问题分组统计)
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
@@ -286,7 +294,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "group by " +
                 "TUMBLE(pt, INTERVAL '3' MINUTE), " +
                 "areaId, " +
-                "numberReport";
+//                "numberReport";
+                "0";
         return tEnv.sqlQuery(sql);
     }
 
@@ -297,8 +306,10 @@ public class CityDistrictDataStat extends BaseJob {
      * @return
      */
     private static Table _statCollect(StreamTableEnvironment tEnv) {
+        // problem_number_report字段置0
         String collectStatSql = "select " +
-                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+//                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(numberReport as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
+                "CONCAT_WS('_',cast(areaId as string),collectLocationCity,collectLocationDistrict,'1',cast(0 as string),substring(max(interfaceRecTime) from 0 for 10)) union_id, " +
                 "areaId area_id, " + // 区域编码
                 "collectLocationCity collect_location_city, " + // 采样点市
                 "collectLocationDistrict collect_location_district, " + // 采样点区县
@@ -310,7 +321,8 @@ public class CityDistrictDataStat extends BaseJob {
 //                "problem_number_stat('1',personIdCard,personPhone,personName,collectCount,collectLimitnum," +
 //                "addTime,collectTime,'','','') problem_number, " +
                 "collect_check(personName,personPhone,personIdCard,collectCount,collectLimitnum,addTime,collectTime,tubeCode) problem_number, " + // 有工单数据量(二次校验不通过数量)
-                "numberReport problem_number_report, " +
+//                "numberReport problem_number_report, " +
+                "0 problem_number_report, " +
                 "0 problem_error, " + // 数据异常问题量(二次校验问题分组统计)。统一在problem_number中计算
                 "0 problem_unsync, " + // 环节不对应问题量(二次校验问题分组统计)。统一在problem_number中计算
                 "max(interfaceRecTime) upload_time, " + // 上传时间(接口接收时间)
@@ -321,7 +333,8 @@ public class CityDistrictDataStat extends BaseJob {
                 "areaId, " +
                 "collectLocationCity , " +
                 "collectLocationDistrict, " +
-                "numberReport";
+//                "numberReport";
+                "0";
         return tEnv.sqlQuery(collectStatSql);
     }
 }

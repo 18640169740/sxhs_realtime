@@ -33,6 +33,9 @@ import java.util.Properties;
 
 // 小时维度上报人次统计任务
 public class ReportPersonCountPerHourStat extends BaseJob {
+    //    private static final String TUMBLE_STR = "TUMBLE(pt, INTERVAL '3' MINUTE), ";
+    private static final String TUMBLE_STR = "TUMBLE(pt, INTERVAL '1' SECOND), ";
+
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
             args = new String[]{
@@ -137,7 +140,7 @@ public class ReportPersonCountPerHourStat extends BaseJob {
                 "max(interfaceRecTime) create_time " +
                 "from report_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
+                TUMBLE_STR +
                 "areaId, " +
                 "hour(TO_TIMESTAMP(collectTime))");
     }
@@ -155,7 +158,7 @@ public class ReportPersonCountPerHourStat extends BaseJob {
                 "max(interfaceRecTime) create_time " +
                 "from collect_data " +
                 "group by " +
-                "TUMBLE(pt, INTERVAL '3' MINUTE), " +
+                TUMBLE_STR +
                 "areaId, " +
                 "hour(TO_TIMESTAMP(collectTime))");
     }
